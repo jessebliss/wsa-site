@@ -37,7 +37,6 @@ export default function QbPage() {
       <section className="bg-ink text-white">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-12 md:flex-row md:items-end md:justify-between">
           <div>
-            <img src={images.qbLogo} alt="Walker Sports Academy" className="mb-4 h-16 w-auto" />
             <h1 className="font-display text-5xl uppercase">Quarterback training</h1>
             <p className="mt-3 max-w-xl text-white/75">$125 per session, or $425 per month for group quarterback sessions.</p>
           </div>
