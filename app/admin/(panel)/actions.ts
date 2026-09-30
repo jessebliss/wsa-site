@@ -68,7 +68,7 @@ export async function saveSession(formData: FormData) {
   } catch (error) {
     fail(back, error);
   }
-  revalidatePath("/book-session");
+  revalidatePath("/");
   revalidatePath("/admin/schedule");
   redirect("/admin/schedule");
 }
@@ -98,7 +98,7 @@ export async function savePlan(formData: FormData) {
   } catch (error) {
     fail("/admin/plans", error);
   }
-  revalidatePath("/book-session");
+  revalidatePath("/");
   redirect("/admin/plans");
 }
 
@@ -165,7 +165,7 @@ export async function saveWaiver(formData: FormData) {
     prisma.waiver.updateMany({ where: { isCurrent: true }, data: { isCurrent: false } }),
     prisma.waiver.create({ data: { body, isCurrent: true } }),
   ]);
-  revalidatePath("/book-session");
+  revalidatePath("/");
   redirect("/admin/waiver");
 }
 

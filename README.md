@@ -1,6 +1,6 @@
 # Walker Sports Academy
 
-Public site and registration for Walker Sports Academy: quarterback training, speed and agility, the schedule, and one admin login.
+Scheduling for Walker Sports Academy. The public site is the session schedule, booking and checkout, membership signup, and the waiver. The academy’s existing website links here. Admin stays at `/admin`.
 
 The schedule is in Eastern Time. Group sessions can be covered by a monthly plan tied to the parent email. Camps and private lessons are one-time payments. A waiver is stored before payment. Card data stays in Stripe.
 

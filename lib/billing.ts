@@ -270,7 +270,7 @@ async function sendSubscriptionReceipt(subscriptionId: string) {
   let portal = "";
   if (sub.stripeCustomerId) {
     try {
-      portal = await billingPortalUrl(sub.stripeCustomerId, `${appUrl()}/book-session`);
+      portal = await billingPortalUrl(sub.stripeCustomerId, `${appUrl()}/`);
     } catch (error) {
       console.error("Billing portal link failed", error);
     }

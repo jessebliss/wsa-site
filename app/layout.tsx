@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     template: "%s | Walker Sports Academy",
   },
   description:
-    "Elite quarterback training and speed & agility training in Jacksonville, led by Coach Ryan Walker.",
+    "Book Walker Sports Academy sessions, monthly plans, and camps.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

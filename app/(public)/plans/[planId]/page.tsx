@@ -24,7 +24,7 @@ export default async function PlanPage({
 
   return (
     <div className="mx-auto max-w-lg px-4 py-8">
-      <Link href="/book-session#plans" className="text-sm font-semibold text-primary">All plans</Link>
+      <Link href="/#plans" className="text-sm font-semibold text-primary">All plans</Link>
       <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-primary">{plan.program}</p>
       <h1 className="font-display text-4xl uppercase">{plan.name}</h1>
       <p className="mt-2 font-display text-4xl">{formatMoney(plan.priceCents)} <span className="text-lg">per month</span></p>

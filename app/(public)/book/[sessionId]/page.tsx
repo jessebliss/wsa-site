@@ -25,7 +25,7 @@ export default async function SessionCheckoutPage({
 
   return (
     <div className="mx-auto max-w-lg px-4 py-8">
-      <Link href="/book-session" className="text-sm font-semibold text-primary">Back to the schedule</Link>
+      <Link href="/" className="text-sm font-semibold text-primary">Back to the schedule</Link>
       <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-primary">{session.program}</p>
       <h1 className="font-display text-4xl uppercase">{session.title}</h1>
       <p className="mt-2 text-sm">{formatEtLong(session.startsAt)} ET</p>

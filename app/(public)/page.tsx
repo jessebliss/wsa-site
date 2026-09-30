@@ -1,69 +1,143 @@
 import Link from "next/link";
-import { images } from "@/lib/content";
-import { Button } from "@/components/ui/button";
+import { offerings } from "@/lib/content";
+import { prisma } from "@/lib/prisma";
+import { occupiedCounts } from "@/lib/booking";
+import { formatMoney } from "@/lib/money";
+import { rangeForDayKeys, upcomingDayKeys } from "@/lib/time";
+import { ScheduleBoard } from "@/components/schedule-board";
 
-export const metadata = { title: "Home" };
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Schedule" };
 
-export default function HomePage() {
+type OfferingSession = {
+  id: string;
+  program: string;
+  title: string;
+  coach: string | null;
+  startsAt: Date;
+  spotsLeft: number;
+};
+
+function offeringBookingHref(offer: (typeof offerings)[number], sessions: OfferingSession[]) {
+  const target = new URL(offer.href, "https://wsa.local");
+  const program = target.searchParams.get("program") ?? "";
+  const coach = target.searchParams.get("coach") ?? "";
+  const sameOffering = sessions.filter((session) => {
+    if (session.program !== program) return false;
+    if (coach && session.coach !== coach) return false;
+    return true;
+  });
+  const titled = sameOffering.filter((session) => {
+    const offerTitle = offer.title.toLowerCase();
+    const sessionTitle = session.title.toLowerCase();
+    return offerTitle.includes(sessionTitle) || sessionTitle.includes(offerTitle);
+  });
+  const open = (titled.length > 0 ? titled : sameOffering)
+    .filter((session) => session.spotsLeft > 0)
+    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+  if (open[0]) return `/book/${open[0].id}`;
+  return `${offer.href}#schedule`;
+}
+
+export default async function SchedulePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ program?: string; coach?: string }>;
+}) {
+  const params = await searchParams;
+  const dayKeys = upcomingDayKeys(21);
+  const range = rangeForDayKeys(dayKeys);
+  const [sessions, plans] = await Promise.all([
+    prisma.trainingSession.findMany({
+      where: { status: "SCHEDULED", startsAt: { gte: range.start, lt: range.end } },
+      orderBy: { startsAt: "asc" },
+    }),
+    prisma.plan.findMany({
+      where: { active: true },
+      orderBy: { sortOrder: "asc" },
+    }),
+  ]);
+  const counts = await occupiedCounts(sessions.map((session) => session.id));
+  const offeringSessions: OfferingSession[] = sessions.map((session) => ({
+    id: session.id,
+    program: session.program,
+    title: session.title,
+    coach: session.coach,
+    startsAt: session.startsAt,
+    spotsLeft: session.capacity - (counts.get(session.id) ?? 0),
+  }));
+
   return (
-    <>
-      <section className="relative overflow-hidden bg-ink text-white">
-        <img src={images.training} alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />
-        <div className="relative mx-auto max-w-6xl px-4 py-16 sm:py-24">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-red-200">Jacksonville, Florida</p>
-          <h1 className="mt-3 max-w-xl font-display text-5xl uppercase leading-none sm:text-7xl">
-            Welcome to Walker Sports Academy
-          </h1>
-          <p className="mt-4 max-w-xl text-lg text-white/85">
-            Quarterback training and speed & agility for athletes in Jacksonville and nationwide.
-          </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Button asChild size="lg"><Link href="/book-session">Book a session</Link></Button>
-            <Button asChild size="lg" variant="outline" className="border-white/30 bg-transparent text-white hover:bg-white/10">
-              <Link href="/about-us">Meet the coaches</Link>
-            </Button>
-          </div>
+    <div className="mx-auto max-w-6xl px-4 py-8">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Book a session</p>
+      <h1 className="font-display text-5xl uppercase">Schedule</h1>
+      <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+        Times are Eastern. Group sessions can use a monthly plan. Camps and private lessons are paid once. A full session shows as sold out.
+      </p>
+
+      <div id="schedule" className="mt-6 scroll-mt-24">
+        <ScheduleBoard
+          key={`${params.program ?? ""}|${params.coach ?? ""}`}
+          dayKeys={dayKeys}
+          initialProgram={params.program ?? ""}
+          initialCoach={params.coach ?? ""}
+          sessions={sessions.map((session) => ({
+            id: session.id,
+            kind: session.kind,
+            program: session.program,
+            title: session.title,
+            coach: session.coach,
+            startsAt: session.startsAt.toISOString(),
+            endsAt: session.endsAt.toISOString(),
+            capacity: session.capacity,
+            spotsLeft: session.capacity - (counts.get(session.id) ?? 0),
+            priceCents: session.priceCents,
+            location: session.location,
+          }))}
+        />
+      </div>
+
+      <section id="plans" className="mt-12 scroll-mt-24">
+        <h2 className="font-display text-4xl uppercase">Monthly plans</h2>
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+          Each plan is a number of group sessions in that program. Unused sessions do not roll over. Camps and private lessons are not included.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {plans.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Plans will show here once the academy publishes them.</p>
+          ) : (
+            plans.map((plan) => (
+              <Link key={plan.id} href={`/plans/${plan.id}`} className="rounded-2xl bg-white p-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary">{plan.program}</p>
+                <h3 className="font-display text-3xl uppercase">{plan.name}</h3>
+                <p className="mt-2 font-display text-4xl">{formatMoney(plan.priceCents)}<span className="text-base"> / month</span></p>
+                <p className="mt-1 text-sm">{plan.sessionsPerMonth} group sessions each month</p>
+              </Link>
+            ))
+          )}
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-6xl gap-4 px-4 py-12 md:grid-cols-3">
-        <article className="rounded-2xl bg-white p-5">
-          <img src={images.qbPoster} alt="Walker Sports Academy quarterback poster" className="mb-4 h-40 w-full rounded-xl object-cover" />
-          <h2 className="font-display text-3xl uppercase">Quarterback training</h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            Our quarterback training focuses on developing the physical, technical, and mental skills required to excel at the highest level.
-          </p>
-          <Link href="/qb-training" className="mt-4 inline-block text-sm font-semibold text-primary">More info</Link>
-        </article>
-        <article className="rounded-2xl bg-white p-5">
-          <img src={images.ryan} alt="Coach Ryan Walker" className="mb-4 h-40 w-full rounded-xl object-cover object-top" />
-          <h2 className="font-display text-3xl uppercase">About our coaches</h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            Meet and learn more about our coaches that bring a wide pool of knowledge and experience from the professional and college ranks.
-          </p>
-          <Link href="/about-us" className="mt-4 inline-block text-sm font-semibold text-primary">More info</Link>
-        </article>
-        <article className="rounded-2xl bg-white p-5">
-          <img src={images.speed1} alt="Speed and agility training" className="mb-4 h-40 w-full rounded-xl object-cover" />
-          <h2 className="font-display text-3xl uppercase">Speed & agility training</h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            Our training program is designed using a scientific approach tailored to each athlete&apos;s sport and position.
-          </p>
-          <Link href="/speed-agility" className="mt-4 inline-block text-sm font-semibold text-primary">More info</Link>
-        </article>
-      </section>
-
-      <section className="bg-ink text-white">
-        <div className="mx-auto grid max-w-6xl items-center gap-6 px-4 py-12 md:grid-cols-[180px_1fr]">
-          <img src={images.mac} alt="Mac Jones" className="h-44 w-44 rounded-full object-cover" />
-          <figure>
-            <blockquote className="font-display text-2xl uppercase leading-tight sm:text-3xl">
-              “Ryan has been a great coach, mentor, and friend over the years. His coaching on the field and in the film room is unmatched and appreciated every time.”
-            </blockquote>
-            <figcaption className="mt-3 text-sm text-white/70">Mac Jones / NFL quarterback — 49ers</figcaption>
-          </figure>
+      <section className="mt-12">
+        <h2 className="font-display text-3xl uppercase">Train with</h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {offerings.map((offer) => (
+            <Link key={offer.title} href={offeringBookingHref(offer, offeringSessions)} className="overflow-hidden rounded-2xl bg-white">
+              <img
+                src={offer.image}
+                alt=""
+                className="h-72 w-full object-cover"
+                style={{ objectPosition: offer.imagePosition }}
+              />
+              <div className="p-4">
+                <p className="text-xs text-muted-foreground">{offer.detail}</p>
+                <h3 className="mt-1 font-display text-2xl uppercase leading-none">{offer.title}</h3>
+                <p className="mt-3 text-sm font-semibold text-primary">Book</p>
+              </div>
+            </Link>
+          ))}
         </div>
       </section>
-    </>
+    </div>
   );
 }

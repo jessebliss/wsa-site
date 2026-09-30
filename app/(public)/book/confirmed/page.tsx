@@ -32,7 +32,7 @@ export default async function ConfirmedPage({
       ) : (
         <p className="mt-3">We could not find that registration.</p>
       )}
-      <Link href="/book-session" className="mt-6 inline-block text-sm font-semibold text-primary">Back to the schedule</Link>
+      <Link href="/" className="mt-6 inline-block text-sm font-semibold text-primary">Back to the schedule</Link>
     </div>
   );
 }

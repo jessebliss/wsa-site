@@ -36,7 +36,7 @@ export default async function SuccessPage({
     <div className="mx-auto max-w-lg px-4 py-12">
       <h1 className="font-display text-5xl uppercase">Payment</h1>
       <p className="mt-3">{detail}</p>
-      <Link href="/book-session" className="mt-6 inline-block text-sm font-semibold text-primary">Back to the schedule</Link>
+      <Link href="/" className="mt-6 inline-block text-sm font-semibold text-primary">Back to the schedule</Link>
     </div>
   );
 }
