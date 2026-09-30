@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
+import { sessionMatchesFilter, type ScheduleKind } from "@/lib/schedule-filter";
 import { dayStripLabel, etDayKey, formatEtTime } from "@/lib/time";
 
 export type ScheduleSession = {
@@ -30,30 +31,36 @@ const kinds = [
 export function ScheduleBoard({
   sessions,
   dayKeys,
-  initialProgram = "",
-  initialCoach = "",
+  day,
+  kind,
+  program,
+  coach,
+  onDay,
+  onKind,
+  onProgram,
+  onCoach,
 }: {
   sessions: ScheduleSession[];
   dayKeys: string[];
-  initialProgram?: string;
-  initialCoach?: string;
+  day: string;
+  kind: ScheduleKind;
+  program: string;
+  coach: string;
+  onDay: (day: string) => void;
+  onKind: (kind: ScheduleKind) => void;
+  onProgram: (program: string) => void;
+  onCoach: (coach: string) => void;
 }) {
-  const [day, setDay] = useState(dayKeys[0] ?? "");
-  const [kind, setKind] = useState<(typeof kinds)[number]["id"]>("ALL");
-  const [program, setProgram] = useState(initialProgram);
-  const [coach, setCoach] = useState(initialCoach);
-
   const programs = useMemo(() => {
-    return Array.from(new Set(sessions.map((session) => session.program)));
-  }, [sessions]);
+    const names = Array.from(new Set(sessions.map((session) => session.program)));
+    if (program && !names.includes(program)) names.push(program);
+    return names;
+  }, [sessions, program]);
 
+  const filter = { kind, program, coach };
   const visible = sessions.filter((session) => {
-    const key = etDayKey(new Date(session.startsAt));
-    if (key !== day) return false;
-    if (kind !== "ALL" && session.kind !== kind) return false;
-    if (program && session.program !== program) return false;
-    if (coach && session.coach !== coach) return false;
-    return true;
+    if (etDayKey(new Date(session.startsAt)) !== day) return false;
+    return sessionMatchesFilter(session, filter);
   });
 
   return (
@@ -63,7 +70,7 @@ export function ScheduleBoard({
           <button
             key={item.id}
             type="button"
-            onClick={() => setKind(item.id)}
+            onClick={() => onKind(item.id)}
             className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold ${
               kind === item.id ? "bg-primary text-white" : "bg-white text-foreground"
             }`}
@@ -75,7 +82,7 @@ export function ScheduleBoard({
       <div className="mt-3 flex gap-2 overflow-x-auto pb-2" aria-label="Program">
         <button
           type="button"
-          onClick={() => setProgram("")}
+          onClick={() => onProgram("")}
           className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold ${
             program === "" ? "bg-ink text-white" : "bg-white"
           }`}
@@ -86,7 +93,7 @@ export function ScheduleBoard({
           <button
             key={item}
             type="button"
-            onClick={() => setProgram(item)}
+            onClick={() => onProgram(item)}
             className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold ${
               program === item ? "bg-ink text-white" : "bg-white"
             }`}
@@ -96,20 +103,22 @@ export function ScheduleBoard({
         ))}
       </div>
       {coach ? (
-        <button type="button" className="mt-2 text-sm font-semibold text-primary" onClick={() => setCoach("")}>
+        <button type="button" className="mt-2 text-sm font-semibold text-primary" onClick={() => onCoach("")}>
           Showing {coach}. Clear coach filter.
         </button>
       ) : null}
       <div className="mt-4 flex gap-2 overflow-x-auto pb-2" aria-label="Dates">
         {dayKeys.map((key) => {
           const label = dayStripLabel(key);
-          const count = sessions.filter((session) => etDayKey(new Date(session.startsAt)) === key).length;
+          const count = sessions.filter(
+            (session) => etDayKey(new Date(session.startsAt)) === key && sessionMatchesFilter(session, filter),
+          ).length;
           const selected = key === day;
           return (
             <button
               key={key}
               type="button"
-              onClick={() => setDay(key)}
+              onClick={() => onDay(key)}
               className={`min-w-16 shrink-0 rounded-xl px-3 py-2 text-center ${
                 selected ? "bg-primary text-white" : "bg-white"
               }`}

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { occupiedCounts } from "@/lib/booking";
 import { formatMoney } from "@/lib/money";
 import { rangeForDayKeys, upcomingDayKeys } from "@/lib/time";
-import { ScheduleBoard } from "@/components/schedule-board";
+import { PublicSchedule } from "@/components/public-schedule";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Schedule" };
@@ -75,69 +75,58 @@ export default async function SchedulePage({
         Times are Eastern. Group sessions can use a monthly plan. Camps and private lessons are paid once. A full session shows as sold out.
       </p>
 
-      <div id="schedule" className="mt-6 scroll-mt-24">
-        <ScheduleBoard
-          key={`${params.program ?? ""}|${params.coach ?? ""}`}
-          dayKeys={dayKeys}
-          initialProgram={params.program ?? ""}
-          initialCoach={params.coach ?? ""}
-          sessions={sessions.map((session) => ({
-            id: session.id,
-            kind: session.kind,
-            program: session.program,
-            title: session.title,
-            coach: session.coach,
-            startsAt: session.startsAt.toISOString(),
-            endsAt: session.endsAt.toISOString(),
-            capacity: session.capacity,
-            spotsLeft: session.capacity - (counts.get(session.id) ?? 0),
-            priceCents: session.priceCents,
-            location: session.location,
-          }))}
-        />
-      </div>
-
-      <section id="plans" className="mt-12 scroll-mt-24">
-        <h2 className="font-display text-4xl uppercase">Monthly plans</h2>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Each plan is a number of group sessions in that program. Unused sessions do not roll over. Camps and private lessons are not included.
-        </p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {plans.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Plans will show here once the academy publishes them.</p>
-          ) : (
-            plans.map((plan) => (
-              <Link key={plan.id} href={`/plans/${plan.id}`} className="rounded-2xl bg-white p-5">
-                <p className="text-xs font-semibold uppercase tracking-wide text-primary">{plan.program}</p>
-                <h3 className="font-display text-3xl uppercase">{plan.name}</h3>
-                <p className="mt-2 font-display text-4xl">{formatMoney(plan.priceCents)}<span className="text-base"> / month</span></p>
-                <p className="mt-1 text-sm">{plan.sessionsPerMonth} group sessions each month</p>
-              </Link>
-            ))
-          )}
-        </div>
-      </section>
-
-      <section className="mt-12">
-        <h2 className="font-display text-3xl uppercase">Train with</h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {offerings.map((offer) => (
-            <Link key={offer.title} href={offeringBookingHref(offer, offeringSessions)} className="overflow-hidden rounded-2xl bg-white">
-              <img
-                src={offer.image}
-                alt=""
-                className="h-72 w-full object-cover"
-                style={{ objectPosition: offer.imagePosition }}
-              />
-              <div className="p-4">
-                <p className="text-xs text-muted-foreground">{offer.detail}</p>
-                <h3 className="mt-1 font-display text-2xl uppercase leading-none">{offer.title}</h3>
-                <p className="mt-3 text-sm font-semibold text-primary">Book</p>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
+      <PublicSchedule
+        key={`${params.program ?? ""}|${params.coach ?? ""}`}
+        dayKeys={dayKeys}
+        initialProgram={params.program ?? ""}
+        initialCoach={params.coach ?? ""}
+        sessions={sessions.map((session) => ({
+          id: session.id,
+          kind: session.kind,
+          program: session.program,
+          title: session.title,
+          coach: session.coach,
+          startsAt: session.startsAt.toISOString(),
+          endsAt: session.endsAt.toISOString(),
+          capacity: session.capacity,
+          spotsLeft: session.capacity - (counts.get(session.id) ?? 0),
+          priceCents: session.priceCents,
+          location: session.location,
+        }))}
+        offerings={offerings.map((offer) => {
+          const target = new URL(offer.href, "https://wsa.local");
+          return {
+            title: offer.title,
+            detail: offer.detail,
+            image: offer.image,
+            imagePosition: offer.imagePosition,
+            href: offeringBookingHref(offer, offeringSessions),
+            program: target.searchParams.get("program") ?? "",
+            coach: target.searchParams.get("coach") ?? "",
+          };
+        })}
+      >
+        <section id="plans" className="mt-12 scroll-mt-24">
+          <h2 className="font-display text-4xl uppercase">Monthly plans</h2>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+            Each plan is a number of group sessions in that program. Unused sessions do not roll over. Camps and private lessons are not included.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {plans.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Plans will show here once the academy publishes them.</p>
+            ) : (
+              plans.map((plan) => (
+                <Link key={plan.id} href={`/plans/${plan.id}`} className="rounded-2xl bg-white p-5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">{plan.program}</p>
+                  <h3 className="font-display text-3xl uppercase">{plan.name}</h3>
+                  <p className="mt-2 font-display text-4xl">{formatMoney(plan.priceCents)}<span className="text-base"> / month</span></p>
+                  <p className="mt-1 text-sm">{plan.sessionsPerMonth} group sessions each month</p>
+                </Link>
+              ))
+            )}
+          </div>
+        </section>
+      </PublicSchedule>
     </div>
   );
 }
