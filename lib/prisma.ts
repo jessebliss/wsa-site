@@ -1,8 +1,9 @@
+import "./ws-env";
+import ws from "ws";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { neonConfig } from "@neondatabase/serverless";
-import ws from "ws";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
