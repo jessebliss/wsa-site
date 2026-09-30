@@ -9,6 +9,36 @@ import { ScheduleBoard } from "@/components/schedule-board";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Book Session" };
 
+type OfferingSession = {
+  id: string;
+  program: string;
+  title: string;
+  coach: string | null;
+  startsAt: Date;
+  spotsLeft: number;
+};
+
+function offeringBookingHref(offer: (typeof offerings)[number], sessions: OfferingSession[]) {
+  const target = new URL(offer.href, "https://wsa.local");
+  const program = target.searchParams.get("program") ?? "";
+  const coach = target.searchParams.get("coach") ?? "";
+  const sameOffering = sessions.filter((session) => {
+    if (session.program !== program) return false;
+    if (coach && session.coach !== coach) return false;
+    return true;
+  });
+  const titled = sameOffering.filter((session) => {
+    const offerTitle = offer.title.toLowerCase();
+    const sessionTitle = session.title.toLowerCase();
+    return offerTitle.includes(sessionTitle) || sessionTitle.includes(offerTitle);
+  });
+  const open = (titled.length > 0 ? titled : sameOffering)
+    .filter((session) => session.spotsLeft > 0)
+    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+  if (open[0]) return `/book/${open[0].id}`;
+  return `${offer.href}#schedule`;
+}
+
 export default async function BookSessionPage({
   searchParams,
 }: {
@@ -28,6 +58,14 @@ export default async function BookSessionPage({
     }),
   ]);
   const counts = await occupiedCounts(sessions.map((session) => session.id));
+  const offeringSessions: OfferingSession[] = sessions.map((session) => ({
+    id: session.id,
+    program: session.program,
+    title: session.title,
+    coach: session.coach,
+    startsAt: session.startsAt,
+    spotsLeft: session.capacity - (counts.get(session.id) ?? 0),
+  }));
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
@@ -37,8 +75,9 @@ export default async function BookSessionPage({
         Times are Eastern. Group sessions can use a monthly plan. Camps and private lessons are paid once. A full session shows as sold out.
       </p>
 
-      <div className="mt-6">
+      <div id="schedule" className="mt-6 scroll-mt-24">
         <ScheduleBoard
+          key={`${params.program ?? ""}|${params.coach ?? ""}`}
           dayKeys={dayKeys}
           initialProgram={params.program ?? ""}
           initialCoach={params.coach ?? ""}
@@ -83,7 +122,7 @@ export default async function BookSessionPage({
         <h2 className="font-display text-3xl uppercase">Train with</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {offerings.map((offer) => (
-            <Link key={offer.title} href={offer.href} className="overflow-hidden rounded-2xl bg-white">
+            <Link key={offer.title} href={offeringBookingHref(offer, offeringSessions)} className="overflow-hidden rounded-2xl bg-white">
               <img
                 src={offer.image}
                 alt=""
