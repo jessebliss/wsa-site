@@ -1,0 +1,206 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SessionKind {
+  GROUP
+  CAMP
+  PRIVATE
+}
+
+enum SessionStatus {
+  SCHEDULED
+  CANCELED
+}
+
+enum RegistrationKind {
+  ONE_TIME
+  PLAN_CREDIT
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+  EXPIRED
+}
+
+enum SubscriptionStatus {
+  INCOMPLETE
+  ACTIVE
+  PAST_DUE
+  PAUSED
+  CANCELED
+}
+
+model Plan {
+  id               String         @id @default(cuid())
+  seedKey          String?        @unique
+  name             String
+  program          String
+  sessionsPerMonth Int
+  priceCents       Int
+  stripeProductId  String?
+  stripePriceId    String?
+  active           Boolean        @default(true)
+  sortOrder        Int            @default(0)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  subscriptions    Subscription[]
+
+  @@index([active, sortOrder])
+  @@map("plans")
+}
+
+model TrainingSession {
+  id            String         @id @default(cuid())
+  seedKey       String?        @unique
+  kind          SessionKind
+  program       String
+  title         String
+  coach         String?
+  description   String?
+  location      String
+  startsAt      DateTime
+  endsAt        DateTime
+  capacity      Int
+  priceCents    Int
+  status        SessionStatus  @default(SCHEDULED)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  registrations Registration[]
+
+  @@index([startsAt])
+  @@index([status, startsAt])
+  @@map("sessions")
+}
+
+model Waiver {
+  id          String             @id @default(cuid())
+  body        String
+  isCurrent   Boolean            @default(false)
+  createdAt   DateTime           @default(now())
+  acceptances WaiverAcceptance[]
+
+  @@index([isCurrent, createdAt])
+  @@map("waivers")
+}
+
+model WaiverAcceptance {
+  id            String         @id @default(cuid())
+  fullName      String
+  email         String
+  acceptedAt    DateTime       @default(now())
+  waiverText    String
+  waiverId      String?
+  waiver        Waiver?        @relation(fields: [waiverId], references: [id])
+  registrations Registration[]
+  subscriptions Subscription[]
+
+  @@index([email])
+  @@map("waiver_acceptances")
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  email                String
+  parentName           String
+  phone                String
+  playerName           String
+  planId               String
+  plan                 Plan               @relation(fields: [planId], references: [id])
+  priceCents           Int
+  sessionsIncluded     Int
+  stripeCustomerId     String?
+  stripeSubscriptionId String?            @unique
+  status               SubscriptionStatus @default(INCOMPLETE)
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  sessionsUsed         Int                @default(0)
+  waiverAcceptanceId   String?
+  waiverAcceptance     WaiverAcceptance?  @relation(fields: [waiverAcceptanceId], references: [id])
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  registrations        Registration[]
+
+  @@index([email])
+  @@index([status])
+  @@index([planId])
+  @@index([createdAt])
+  @@map("subscriptions")
+}
+
+model Registration {
+  id                      String           @id @default(cuid())
+  sessionId               String
+  session                 TrainingSession  @relation(fields: [sessionId], references: [id])
+  email                   String
+  parentName              String
+  phone                   String
+  playerName              String
+  kind                    RegistrationKind
+  paymentStatus           PaymentStatus    @default(PENDING)
+  amountCents             Int
+  stripeCheckoutSessionId String?          @unique
+  stripePaymentIntentId   String?
+  promoCodeId             String?
+  promoCode               PromoCode?       @relation(fields: [promoCodeId], references: [id])
+  subscriptionId          String?
+  subscription            Subscription?    @relation(fields: [subscriptionId], references: [id])
+  waiverAcceptanceId      String
+  waiverAcceptance        WaiverAcceptance @relation(fields: [waiverAcceptanceId], references: [id])
+  attended                Boolean?
+  holdExpiresAt           DateTime?
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+
+  @@index([sessionId, email])
+  @@index([sessionId, paymentStatus])
+  @@index([email])
+  @@index([createdAt])
+  @@index([stripePaymentIntentId])
+  @@map("registrations")
+}
+
+model PromoCode {
+  id                    String         @id @default(cuid())
+  code                  String         @unique
+  percentOff            Int?
+  amountOffCents        Int?
+  active                Boolean        @default(true)
+  stripeCouponId        String?
+  stripePromotionCodeId String?
+  createdAt             DateTime       @default(now())
+  registrations         Registration[]
+
+  @@index([active])
+  @@map("promo_codes")
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  firstName String
+  lastName  String
+  email     String
+  subject   String?
+  message   String
+  phone     String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([email])
+  @@map("contact_messages")
+}
+
+model StripeEvent {
+  id        String   @id
+  createdAt DateTime @default(now())
+
+  @@map("stripe_events")
+}
