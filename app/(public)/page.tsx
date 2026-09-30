@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { offerings } from "@/lib/content";
-import { sessionWithinOpening } from "@/lib/availability";
+import { coaches } from "@/lib/content";
 import { prisma } from "@/lib/prisma";
 import { occupiedCounts } from "@/lib/booking";
 import { formatMoney } from "@/lib/money";
@@ -11,43 +10,7 @@ import { PublicSchedule } from "@/components/public-schedule";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Schedule" };
 
-type OfferingSession = {
-  id: string;
-  program: string;
-  title: string;
-  coach: string | null;
-  startsAt: Date;
-  endsAt: Date;
-  spotsLeft: number;
-};
-
-function offeringBookingHref(offer: (typeof offerings)[number], sessions: OfferingSession[]) {
-  const target = new URL(offer.href, "https://wsa.local");
-  const program = target.searchParams.get("program") ?? "";
-  const coach = target.searchParams.get("coach") ?? "";
-  const sameOffering = sessions.filter((session) => {
-    if (session.program !== program) return false;
-    if (coach && session.coach !== coach) return false;
-    return true;
-  });
-  const titled = sameOffering.filter((session) => {
-    const offerTitle = offer.title.toLowerCase();
-    const sessionTitle = session.title.toLowerCase();
-    return offerTitle.includes(sessionTitle) || sessionTitle.includes(offerTitle);
-  });
-  const open = (titled.length > 0 ? titled : sameOffering)
-    .filter((session) => session.spotsLeft > 0)
-    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
-  if (open[0]) return `/book/${open[0].id}`;
-  return `${offer.href}#schedule`;
-}
-
-export default async function SchedulePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ program?: string; coach?: string }>;
-}) {
-  const params = await searchParams;
+export default async function SchedulePage() {
   const todayKey = etDayKey(new Date());
   const currentMonth = todayKey.slice(0, 7);
   const maxMonth = shiftMonth(currentMonth, 5);
@@ -65,34 +28,21 @@ export default async function SchedulePage({
     loadOpenings(todayKey, etDayKey(new Date(rangeEnd.getTime() - 60 * 1000))),
   ]);
   const counts = await occupiedCounts(sessions.map((session) => session.id));
-  const offeringSessions: OfferingSession[] = sessions
-    .filter((session) => sessionWithinOpening(session, openings))
-    .map((session) => ({
-      id: session.id,
-      program: session.program,
-      title: session.title,
-      coach: session.coach,
-      startsAt: session.startsAt,
-      endsAt: session.endsAt,
-      spotsLeft: session.capacity - (counts.get(session.id) ?? 0),
-    }));
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Book a session</p>
       <h1 className="font-display text-5xl uppercase">Schedule</h1>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-        Times are Eastern. Group sessions can use a monthly plan. Camps and private lessons are paid once. A full session shows as sold out.
+        Times are Eastern. Pick what you want, who you want, then a day. Group sessions can use a monthly plan. Camps and private lessons are paid once.
       </p>
 
       <PublicSchedule
-        key={`${params.program ?? ""}|${params.coach ?? ""}`}
         todayKey={todayKey}
         currentMonth={currentMonth}
         maxMonth={maxMonth}
         openings={openings}
-        initialProgram={params.program ?? ""}
-        initialCoach={params.coach ?? ""}
+        portraits={Object.fromEntries(coaches.map((coach) => [coach.name, coach.photo]))}
         sessions={sessions.map((session) => ({
           id: session.id,
           kind: session.kind,
@@ -106,18 +56,6 @@ export default async function SchedulePage({
           priceCents: session.priceCents,
           location: session.location,
         }))}
-        offerings={offerings.map((offer) => {
-          const target = new URL(offer.href, "https://wsa.local");
-          return {
-            title: offer.title,
-            detail: offer.detail,
-            image: offer.image,
-            imagePosition: offer.imagePosition,
-            href: offeringBookingHref(offer, offeringSessions),
-            program: target.searchParams.get("program") ?? "",
-            coach: target.searchParams.get("coach") ?? "",
-          };
-        })}
       >
         <section id="plans" className="mt-12 scroll-mt-24">
           <h2 className="font-display text-4xl uppercase">Monthly plans</h2>
