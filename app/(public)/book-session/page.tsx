@@ -87,7 +87,7 @@ export default async function BookSessionPage({
               <img
                 src={offer.image}
                 alt=""
-                className="h-36 w-full object-cover"
+                className="h-72 w-full object-cover"
                 style={{ objectPosition: offer.imagePosition }}
               />
               <div className="p-4">
