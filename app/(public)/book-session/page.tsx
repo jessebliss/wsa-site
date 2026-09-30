@@ -84,7 +84,12 @@ export default async function BookSessionPage({
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {offerings.map((offer) => (
             <Link key={offer.title} href={offer.href} className="overflow-hidden rounded-2xl bg-white">
-              <img src={offer.image} alt="" className="h-36 w-full object-cover" />
+              <img
+                src={offer.image}
+                alt=""
+                className="h-36 w-full object-cover"
+                style={{ objectPosition: offer.imagePosition }}
+              />
               <div className="p-4">
                 <p className="text-xs text-muted-foreground">{offer.detail}</p>
                 <h3 className="mt-1 font-display text-2xl uppercase leading-none">{offer.title}</h3>

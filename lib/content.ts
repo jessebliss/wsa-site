@@ -89,36 +89,43 @@ export const offerings = [
     title: "Quarterback training with Ryan Walker",
     detail: "Schedule an introduction session or weekly training.",
     image: images.ryan,
+    imagePosition: "center top",
     href: "/book-session?program=Quarterback+Training&coach=Ryan+Walker",
   },
   {
     title: "Speed & agility training with Ryan Walker",
     detail: "Schedule speed and agility sessions.",
     image: images.speedCard,
+    // The face sits under a band of sky, so a pure top anchor leaves the head at the bottom of the card.
+    imagePosition: "center 10%",
     href: "/book-session?program=Speed+%26+Agility&coach=Ryan+Walker",
   },
   {
     title: "Quarterback training with Matt Considine",
     detail: "Schedule an introduction session or weekly training.",
     image: images.matt,
+    imagePosition: "center top",
     href: "/book-session?program=Quarterback+Training&coach=Matt+Considine",
   },
   {
     title: "Girls elite quarterback training",
     detail: "Register for girls flag training led by Ryan Walker.",
     image: images.girls,
+    imagePosition: "center top",
     href: "/book-session?program=Girls+Flag",
   },
   {
     title: "Quarterback training with Jim McLeod",
     detail: "Schedule an introduction session or weekly training.",
     image: images.jim,
+    imagePosition: "center top",
     href: "/book-session?program=Quarterback+Training&coach=Jim+McLeod",
   },
   {
     title: "Quarterback training with Tannor Watson",
     detail: "Schedule an introduction session or weekly training.",
     image: images.tannor,
+    imagePosition: "center top",
     href: "/book-session?program=Quarterback+Training&coach=Tannor+Watson",
   },
 ];
