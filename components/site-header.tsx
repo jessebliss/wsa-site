@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { images } from "@/lib/content";
 import { ACADEMY_PHONE, ACADEMY_PHONE_TEL } from "@/lib/utils";
@@ -18,6 +20,13 @@ const links = [
 ];
 
 export function SiteHeader() {
+  const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
   return (
     <header className="sticky top-0 z-40 bg-ink text-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
@@ -35,7 +44,7 @@ export function SiteHeader() {
           <Button asChild className="hidden sm:inline-flex">
             <Link href="/book-session">Book</Link>
           </Button>
-          <Dialog>
+          <Dialog open={menuOpen} onOpenChange={setMenuOpen}>
             <DialogTrigger asChild>
               <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Open menu">
                 <Menu />
@@ -48,6 +57,7 @@ export function SiteHeader() {
                   <Link
                     key={link.href}
                     href={link.href}
+                    onClick={() => setMenuOpen(false)}
                     className="rounded-md px-2 py-3 text-lg font-semibold uppercase tracking-wide hover:bg-white/10"
                   >
                     {link.label}
