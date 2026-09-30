@@ -79,13 +79,14 @@ export function ScheduleBoard({
           </button>
         ))}
       </div>
-      <div className="mt-3 flex gap-2 overflow-x-auto pb-2" aria-label="Program">
+      <div className="mt-3 flex gap-2 overflow-x-auto overflow-y-hidden pb-2" aria-label="Program">
         <button
           type="button"
           onClick={() => onProgram("")}
-          className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold ${
-            program === "" ? "bg-ink text-white" : "bg-white"
+          className={`min-h-11 shrink-0 appearance-none rounded-full px-4 text-sm font-semibold ${
+            !program ? "bg-ink text-white" : "bg-white text-foreground"
           }`}
+          aria-pressed={!program}
         >
           All programs
         </button>
@@ -94,9 +95,10 @@ export function ScheduleBoard({
             key={item}
             type="button"
             onClick={() => onProgram(item)}
-            className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold ${
-              program === item ? "bg-ink text-white" : "bg-white"
+            className={`min-h-11 shrink-0 appearance-none rounded-full px-4 text-sm font-semibold ${
+              program === item ? "bg-ink text-white" : "bg-white text-foreground"
             }`}
+            aria-pressed={program === item}
           >
             {item}
           </button>

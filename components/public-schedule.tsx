@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { ScheduleBoard, type ScheduleSession } from "@/components/schedule-board";
 import {
   packageMatchesFilter,
@@ -36,9 +36,22 @@ export function PublicSchedule({
   children?: ReactNode;
 }) {
   const [kind, setKind] = useState<ScheduleKind>("ALL");
-  const [program, setProgram] = useState(initialProgram);
+  const [program, setProgram] = useState(initialProgram || "");
   const [coach, setCoach] = useState(initialCoach);
   const [day, setDay] = useState("");
+
+  // A refresh with no program param is All programs, including when iOS restores the page.
+  useLayoutEffect(() => {
+    if (!new URLSearchParams(window.location.search).get("program")) setProgram("");
+  }, []);
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      if (!new URLSearchParams(window.location.search).get("program")) setProgram("");
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
 
   const filter: ScheduleFilter = { kind, program, coach };
   const days = visibleDayKeys(dayKeys, sessions, offerings, filter);
