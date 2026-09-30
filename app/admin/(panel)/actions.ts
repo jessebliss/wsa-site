@@ -18,11 +18,24 @@ import {
   setCustomPrice,
   setNextBillDate,
 } from "@/lib/subscription-admin";
-import { etToUtc } from "@/lib/time";
+import { hourStartsForDay } from "@/lib/availability";
+import { hashPassword } from "@/lib/password";
+import { etDayKey, etToUtc, shiftMonth } from "@/lib/time";
+import { normalizeEmail } from "@/lib/utils";
+import { Prisma } from "@prisma/client";
 
 async function requireAdmin() {
   const session = await auth();
   if (!session?.user) redirect("/admin/login");
+  if (session.user.role === "coach") redirect("/admin/availability");
+  return session;
+}
+
+async function requireCoach() {
+  const session = await auth();
+  const staffUserId = session?.user?.role === "coach" ? session.user.id : undefined;
+  if (!staffUserId) redirect("/admin/login");
+  return staffUserId;
 }
 
 function fail(path: string, error: unknown): never {
@@ -32,6 +45,79 @@ function fail(path: string, error: unknown): never {
 
 export async function logout() {
   await signOut({ redirectTo: "/admin/login" });
+}
+
+export async function createCoach(formData: FormData) {
+  await requireAdmin();
+  try {
+    const name = String(formData.get("name") ?? "").trim();
+    const email = normalizeEmail(String(formData.get("email") ?? ""));
+    const password = String(formData.get("password") ?? "");
+    const coachName = String(formData.get("coachName") ?? "").trim();
+    if (!name || !coachName) throw new Error("Name and the coach on the schedule are required.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a real email address.");
+    if (password.length < 8) throw new Error("Use a password of at least 8 characters.");
+    const adminEmail = process.env.ADMIN_EMAIL ? normalizeEmail(process.env.ADMIN_EMAIL) : "";
+    if (adminEmail && email === adminEmail) throw new Error("That email is the academy admin login.");
+    await prisma.staffUser.create({
+      data: {
+        name,
+        email,
+        passwordHash: await hashPassword(password),
+        coachName,
+      },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      fail("/admin/coaches", new Error("That email or schedule coach already has a login."));
+    }
+    fail("/admin/coaches", error);
+  }
+  revalidatePath("/admin/coaches");
+  redirect("/admin/coaches");
+}
+
+export async function saveCoachDay(formData: FormData) {
+  const staffUserId = await requireCoach();
+  const dayKey = String(formData.get("dayKey") ?? "");
+  const month = dayKey.slice(0, 7);
+  const back = `/admin/availability?month=${month}&day=${dayKey}`;
+  try {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) throw new Error("Choose a day on the calendar.");
+    const todayKey = etDayKey(new Date());
+    const currentMonth = todayKey.slice(0, 7);
+    const latest = shiftMonth(currentMonth, 11);
+    if (dayKey < todayKey) throw new Error("That day has already passed.");
+    if (month < currentMonth || month > latest) throw new Error("That month is outside the calendar.");
+    const unavailable = String(formData.get("unavailable") ?? "") === "yes";
+    const allowed = new Set(hourStartsForDay(dayKey));
+    const hours = Array.from(
+      new Set(
+        formData
+          .getAll("hours")
+          .map((value) => Number(value))
+          .filter((hour) => Number.isInteger(hour) && allowed.has(hour)),
+      ),
+    ).sort((a, b) => a - b);
+    if (!unavailable && hours.length === 0) {
+      throw new Error("Choose at least one hour, or mark the day not available.");
+    }
+    await prisma.coachDay.upsert({
+      where: { staffUserId_dayKey: { staffUserId, dayKey } },
+      create: {
+        staffUserId,
+        dayKey,
+        unavailable,
+        hours: unavailable ? [] : hours,
+      },
+      update: { unavailable, hours: unavailable ? [] : hours },
+    });
+  } catch (error) {
+    fail(back, error);
+  }
+  revalidatePath("/");
+  revalidatePath("/admin/availability");
+  redirect(`${back}&saved=1`);
 }
 
 export async function saveSession(formData: FormData) {

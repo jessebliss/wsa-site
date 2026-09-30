@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { offerings } from "@/lib/content";
+import { sessionWithinOpening } from "@/lib/availability";
 import { prisma } from "@/lib/prisma";
 import { occupiedCounts } from "@/lib/booking";
 import { formatMoney } from "@/lib/money";
-import { rangeForDayKeys, upcomingDayKeys } from "@/lib/time";
+import { loadOpenings } from "@/lib/openings";
+import { etDayKey, etToUtc, shiftMonth } from "@/lib/time";
 import { PublicSchedule } from "@/components/public-schedule";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +17,7 @@ type OfferingSession = {
   title: string;
   coach: string | null;
   startsAt: Date;
+  endsAt: Date;
   spotsLeft: number;
 };
 
@@ -45,27 +48,34 @@ export default async function SchedulePage({
   searchParams: Promise<{ program?: string; coach?: string }>;
 }) {
   const params = await searchParams;
-  const dayKeys = upcomingDayKeys(21);
-  const range = rangeForDayKeys(dayKeys);
-  const [sessions, plans] = await Promise.all([
+  const todayKey = etDayKey(new Date());
+  const currentMonth = todayKey.slice(0, 7);
+  const maxMonth = shiftMonth(currentMonth, 5);
+  const rangeStart = etToUtc(todayKey, "00:00");
+  const rangeEnd = etToUtc(`${shiftMonth(maxMonth, 1)}-01`, "00:00");
+  const [sessions, plans, openings] = await Promise.all([
     prisma.trainingSession.findMany({
-      where: { status: "SCHEDULED", startsAt: { gte: range.start, lt: range.end } },
+      where: { status: "SCHEDULED", startsAt: { gte: rangeStart, lt: rangeEnd } },
       orderBy: { startsAt: "asc" },
     }),
     prisma.plan.findMany({
       where: { active: true },
       orderBy: { sortOrder: "asc" },
     }),
+    loadOpenings(todayKey, etDayKey(new Date(rangeEnd.getTime() - 60 * 1000))),
   ]);
   const counts = await occupiedCounts(sessions.map((session) => session.id));
-  const offeringSessions: OfferingSession[] = sessions.map((session) => ({
-    id: session.id,
-    program: session.program,
-    title: session.title,
-    coach: session.coach,
-    startsAt: session.startsAt,
-    spotsLeft: session.capacity - (counts.get(session.id) ?? 0),
-  }));
+  const offeringSessions: OfferingSession[] = sessions
+    .filter((session) => sessionWithinOpening(session, openings))
+    .map((session) => ({
+      id: session.id,
+      program: session.program,
+      title: session.title,
+      coach: session.coach,
+      startsAt: session.startsAt,
+      endsAt: session.endsAt,
+      spotsLeft: session.capacity - (counts.get(session.id) ?? 0),
+    }));
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
@@ -77,7 +87,10 @@ export default async function SchedulePage({
 
       <PublicSchedule
         key={`${params.program ?? ""}|${params.coach ?? ""}`}
-        dayKeys={dayKeys}
+        todayKey={todayKey}
+        currentMonth={currentMonth}
+        maxMonth={maxMonth}
+        openings={openings}
         initialProgram={params.program ?? ""}
         initialCoach={params.coach ?? ""}
         sessions={sessions.map((session) => ({

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { CheckoutForm } from "@/components/checkout-form";
 import { countOccupied } from "@/lib/booking";
 import { formatMoney } from "@/lib/money";
+import { coachAllowsSession } from "@/lib/openings";
 import { prisma } from "@/lib/prisma";
 import { formatEtLong } from "@/lib/time";
 
@@ -18,6 +19,7 @@ export default async function SessionCheckoutPage({
   if (!session || session.status !== "SCHEDULED") notFound();
   const taken = await countOccupied(session.id);
   const spotsLeft = session.capacity - taken;
+  const coachOpen = await coachAllowsSession(session);
   const waiver = await prisma.waiver.findFirst({
     where: { isCurrent: true },
     orderBy: { createdAt: "desc" },
@@ -42,9 +44,13 @@ export default async function SessionCheckoutPage({
       ) : (
         <p className="mt-2 text-sm text-muted-foreground">This is a one-time payment. Monthly plans do not cover it.</p>
       )}
-      {spotsLeft <= 0 || !waiver ? (
+      {spotsLeft <= 0 || !waiver || !coachOpen ? (
         <p className="mt-6 rounded-xl bg-white p-4 text-sm">
-          {spotsLeft <= 0 ? "This session is sold out." : "The waiver is not published yet."}
+          {spotsLeft <= 0
+            ? "This session is sold out."
+            : !coachOpen
+              ? "This coach is not available for this session."
+              : "The waiver is not published yet."}
         </p>
       ) : (
         <div className="mt-6">

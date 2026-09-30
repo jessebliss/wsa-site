@@ -29,7 +29,7 @@ npm run db:seed
 npm run dev
 ```
 
-Admin is at `/admin/login` using `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
+Staff sign in at `/admin/login`. The academy admin uses `ADMIN_EMAIL` and `ADMIN_PASSWORD` and still manages the schedule, prices, plans, promos, waiver, rosters, and attendance. That admin creates coach logins at `/admin/coaches` (name, email, password) and links each one to a coach already on the schedule. Coaches only see `/admin/availability`: a month calendar where they open one-hour blocks or mark a day not available. The public schedule is a month calendar. A coach with a login is bookable only on days and hours they saved. Coach passwords are never stored in the repo.
 
 Stripe checkout needs test keys (`sk_test_...` and `pk_test_...`). Without them, a parent who has sessions left on a monthly plan can still confirm a group spot. Card payments and new memberships wait on Stripe. Live keys are ignored unless `STRIPE_ALLOW_LIVE=true`.
 
@@ -47,6 +47,6 @@ Point Stripe webhooks at `/api/stripe/webhook` for:
 ## Scripts
 
 - `npm run dev` — local site
-- `npm run build` — generate the Prisma client and build
+- `npm run build` — apply migrations, generate the Prisma client, and build
 - `npm run db:migrate` — apply migrations
 - `npm run db:seed` — add the starter plans, sessions, and waiver if they are missing

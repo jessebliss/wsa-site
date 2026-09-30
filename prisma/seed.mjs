@@ -157,6 +157,9 @@ async function main() {
   ];
   for (const [key, weekday, time, coach, title] of qbGroup) {
     const slots = nextSlots(weekday, time, 2);
+    // Setmore prices QB training with Matt, Jim, and Tannor at $80. Ryan's named session stays $125.
+    const priceCents = coach === "Ryan Walker" ? 12500 : 8000;
+    const priceLabel = priceCents === 12500 ? "$125" : "$80";
     for (let i = 0; i < slots.length; i += 1) {
       await ensureSession({
         seedKey: `${key}-${i + 1}`,
@@ -166,10 +169,10 @@ async function main() {
         coach,
         location: PARK,
         capacity: 8,
-        priceCents: 12500,
+        priceCents,
         startsAt: slots[i],
         endsAt: addMinutes(slots[i], 60),
-        description: "Weekly quarterback training. $125 per session, or the monthly plan when this email has sessions left.",
+        description: `Weekly quarterback training. ${priceLabel} per session, or the monthly plan when this email has sessions left.`,
       });
     }
   }

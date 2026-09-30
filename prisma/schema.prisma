@@ -204,3 +204,31 @@ model StripeEvent {
 
   @@map("stripe_events")
 }
+
+model StaffUser {
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  passwordHash String
+  coachName    String     @unique
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  days         CoachDay[]
+
+  @@map("staff_users")
+}
+
+model CoachDay {
+  id          String    @id @default(cuid())
+  staffUserId String
+  staffUser   StaffUser @relation(fields: [staffUserId], references: [id], onDelete: Cascade)
+  dayKey      String
+  unavailable Boolean   @default(false)
+  hours       Int[]     @default([])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([staffUserId, dayKey])
+  @@index([dayKey])
+  @@map("coach_days")
+}

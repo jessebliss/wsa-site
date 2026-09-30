@@ -1,14 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 import { ScheduleBoard, type ScheduleSession } from "@/components/schedule-board";
-import {
-  packageMatchesFilter,
-  visibleDayKeys,
-  type ScheduleFilter,
-  type ScheduleKind,
-} from "@/lib/schedule-filter";
+import { type OpeningsByCoach } from "@/lib/availability";
+import { packageMatchesFilter, listedSessions, type ScheduleFilter, type ScheduleKind } from "@/lib/schedule-filter";
+import { dayKeysForMonth } from "@/lib/time";
 
 export type OfferingCard = {
   title: string;
@@ -22,14 +19,20 @@ export type OfferingCard = {
 
 export function PublicSchedule({
   sessions,
-  dayKeys,
+  todayKey,
+  currentMonth,
+  maxMonth,
+  openings,
   initialProgram = "",
   initialCoach = "",
   offerings,
   children,
 }: {
   sessions: ScheduleSession[];
-  dayKeys: string[];
+  todayKey: string;
+  currentMonth: string;
+  maxMonth: string;
+  openings: OpeningsByCoach;
   initialProgram?: string;
   initialCoach?: string;
   offerings: OfferingCard[];
@@ -38,6 +41,7 @@ export function PublicSchedule({
   const [kind, setKind] = useState<ScheduleKind>("ALL");
   const [program, setProgram] = useState(initialProgram || "");
   const [coach, setCoach] = useState(initialCoach);
+  const [month, setMonth] = useState(currentMonth);
   const [day, setDay] = useState("");
 
   // A refresh with no program param is All programs, including when iOS restores the page.
@@ -54,8 +58,12 @@ export function PublicSchedule({
   }, []);
 
   const filter: ScheduleFilter = { kind, program, coach };
-  const days = visibleDayKeys(dayKeys, sessions, offerings, filter);
-  const activeDay = days.includes(day) ? day : (days[0] ?? "");
+  const monthDays = useMemo(() => dayKeysForMonth(month), [month]);
+  const marked = monthDays.filter((key) => listedSessions(sessions, offerings, filter, openings, key).length > 0);
+  const activeDay =
+    monthDays.includes(day) && day >= todayKey
+      ? day
+      : (marked.find((key) => key >= todayKey) ?? monthDays.find((key) => key >= todayKey) ?? "");
   const packages = offerings.filter((offer) => packageMatchesFilter(offer, sessions, filter));
 
   return (
@@ -63,12 +71,21 @@ export function PublicSchedule({
       <div id="schedule" className="mt-6 scroll-mt-24">
         <ScheduleBoard
           sessions={sessions}
-          dayKeys={days}
+          offerings={offerings}
+          openings={openings}
+          month={month}
+          minMonth={currentMonth}
+          maxMonth={maxMonth}
+          todayKey={todayKey}
           day={activeDay}
           kind={kind}
           program={program}
           coach={coach}
           onDay={setDay}
+          onMonth={(next) => {
+            setMonth(next);
+            setDay("");
+          }}
           onKind={setKind}
           onProgram={setProgram}
           onCoach={setCoach}

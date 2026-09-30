@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
+import { MonthCalendar } from "@/components/month-calendar";
 import { Badge } from "@/components/ui/badge";
+import { type OpeningsByCoach } from "@/lib/availability";
 import { formatMoney } from "@/lib/money";
-import { sessionMatchesFilter, type ScheduleKind } from "@/lib/schedule-filter";
-import { dayStripLabel, etDayKey, formatEtTime } from "@/lib/time";
+import { listedSessions, type PackageTarget, type ScheduleKind } from "@/lib/schedule-filter";
+import { dayKeysForMonth, etToUtc, formatEt, formatEtTime } from "@/lib/time";
 
 export type ScheduleSession = {
   id: string;
@@ -30,23 +32,35 @@ const kinds = [
 
 export function ScheduleBoard({
   sessions,
-  dayKeys,
+  offerings,
+  openings,
+  month,
+  minMonth,
+  maxMonth,
+  todayKey,
   day,
   kind,
   program,
   coach,
   onDay,
+  onMonth,
   onKind,
   onProgram,
   onCoach,
 }: {
   sessions: ScheduleSession[];
-  dayKeys: string[];
+  offerings: PackageTarget[];
+  openings: OpeningsByCoach;
+  month: string;
+  minMonth: string;
+  maxMonth: string;
+  todayKey: string;
   day: string;
   kind: ScheduleKind;
   program: string;
   coach: string;
   onDay: (day: string) => void;
+  onMonth: (month: string) => void;
   onKind: (kind: ScheduleKind) => void;
   onProgram: (program: string) => void;
   onCoach: (coach: string) => void;
@@ -58,10 +72,9 @@ export function ScheduleBoard({
   }, [sessions, program]);
 
   const filter = { kind, program, coach };
-  const visible = sessions.filter((session) => {
-    if (etDayKey(new Date(session.startsAt)) !== day) return false;
-    return sessionMatchesFilter(session, filter);
-  });
+  const monthDays = useMemo(() => dayKeysForMonth(month), [month]);
+  const marked = monthDays.filter((key) => listedSessions(sessions, offerings, filter, openings, key).length > 0);
+  const visible = listedSessions(sessions, offerings, filter, openings, day);
 
   return (
     <div>
@@ -109,29 +122,23 @@ export function ScheduleBoard({
           Showing {coach}. Clear coach filter.
         </button>
       ) : null}
-      <div className="mt-4 flex gap-2 overflow-x-auto pb-2" aria-label="Dates">
-        {dayKeys.map((key) => {
-          const label = dayStripLabel(key);
-          const count = sessions.filter(
-            (session) => etDayKey(new Date(session.startsAt)) === key && sessionMatchesFilter(session, filter),
-          ).length;
-          const selected = key === day;
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => onDay(key)}
-              className={`min-w-16 shrink-0 rounded-xl px-3 py-2 text-center ${
-                selected ? "bg-primary text-white" : "bg-white"
-              }`}
-            >
-              <span className="block text-[11px] font-semibold tracking-wide">{label.weekday}</span>
-              <span className="block text-sm font-semibold">{label.date}</span>
-              <span className={`mt-1 block h-1.5 w-1.5 rounded-full mx-auto ${count ? (selected ? "bg-white" : "bg-primary") : "bg-transparent"}`} />
-            </button>
-          );
-        })}
+      <div className="mt-4">
+        <MonthCalendar
+          month={month}
+          minMonth={minMonth}
+          maxMonth={maxMonth}
+          todayKey={todayKey}
+          selected={day}
+          marked={marked}
+          onSelect={onDay}
+          onMonth={onMonth}
+        />
       </div>
+      {day ? (
+        <h2 className="mt-4 font-display text-2xl uppercase">
+          {formatEt(etToUtc(day, "12:00"), { weekday: "long", month: "long", day: "numeric" })}
+        </h2>
+      ) : null}
       <div className="mt-4 space-y-3">
         {visible.length === 0 ? (
           <p className="rounded-xl bg-white p-5 text-sm text-muted-foreground">

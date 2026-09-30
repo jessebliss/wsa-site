@@ -1,3 +1,4 @@
+import { sessionWithinOpening, type OpeningsByCoach } from "@/lib/availability";
 import { etDayKey } from "@/lib/time";
 
 export type ScheduleKind = "ALL" | "GROUP" | "CAMP" | "PRIVATE";
@@ -7,6 +8,7 @@ export type FilterableSession = {
   program: string;
   coach: string | null;
   startsAt: string;
+  endsAt: string;
 };
 
 export type PackageTarget = {
@@ -51,16 +53,24 @@ export function packageMatchesFilter(offer: PackageTarget, sessions: FilterableS
 }
 
 export function visibleDayKeys(dayKeys: string[], sessions: FilterableSession[], offerings: PackageTarget[], filter: ScheduleFilter) {
+  return dayKeys.filter((key) => listedSessions(sessions, offerings, filter, {}, key).length > 0);
+}
+
+/** Sessions a parent can book: filters, then a coach login's saved hours. Coaches without a login stay on the admin schedule. */
+export function listedSessions<T extends FilterableSession>(
+  sessions: T[],
+  offerings: PackageTarget[],
+  filter: ScheduleFilter,
+  openings: OpeningsByCoach,
+  dayKey?: string,
+) {
   const narrowed = filter.kind !== "ALL" || Boolean(filter.program) || Boolean(filter.coach);
-  if (!narrowed) {
-    return dayKeys.filter((key) => sessions.some((session) => sessionOnDay(session, key)));
-  }
-  const packages = offerings.filter((offer) => packageMatchesFilter(offer, sessions, filter));
-  return dayKeys.filter((key) =>
-    sessions.some((session) => {
-      if (!sessionOnDay(session, key)) return false;
-      if (!sessionMatchesFilter(session, filter)) return false;
-      return packages.some((offer) => sessionBelongsToPackage(session, offer));
-    }),
-  );
+  const packages = narrowed ? offerings.filter((offer) => packageMatchesFilter(offer, sessions, filter)) : [];
+  return sessions.filter((session) => {
+    if (dayKey && !sessionOnDay(session, dayKey)) return false;
+    if (!sessionWithinOpening(session, openings)) return false;
+    if (!narrowed) return true;
+    if (!sessionMatchesFilter(session, filter)) return false;
+    return packages.some((offer) => sessionBelongsToPackage(session, offer));
+  });
 }

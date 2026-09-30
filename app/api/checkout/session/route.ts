@@ -9,6 +9,7 @@ import {
   holdOneTime,
   previewCredit,
 } from "@/lib/booking";
+import { coachAllowsSession } from "@/lib/openings";
 import { personSchema, zodMessage } from "@/lib/validators";
 import { prisma } from "@/lib/prisma";
 import { getStripe, stripeConfigured } from "@/lib/stripe";
@@ -43,6 +44,9 @@ export async function POST(request: Request) {
     if (!rough.success) return NextResponse.json({ error: "Check the form and try again." }, { status: 400 });
     const session = await prisma.trainingSession.findUnique({ where: { id: rough.data.sessionId } });
     if (!session) return NextResponse.json({ error: "Session not found." }, { status: 404 });
+    if (!(await coachAllowsSession(session))) {
+      return NextResponse.json({ error: "That coach is not available for this session." }, { status: 400 });
+    }
     try {
       let amount = session.priceCents;
       let message = `${formatMoney(session.priceCents)} before the card form.`;

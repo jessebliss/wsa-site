@@ -6,21 +6,34 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   providers: [
     Credentials({
-      name: "Admin",
+      name: "Staff",
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      authorize(credentials) {
+      async authorize(credentials) {
         const email = process.env.ADMIN_EMAIL;
         const password = process.env.ADMIN_PASSWORD;
-        if (!email || !password) return null;
         const givenEmail = typeof credentials?.email === "string" ? credentials.email : "";
         const givenPassword = typeof credentials?.password === "string" ? credentials.password : "";
-        if (givenEmail === email && givenPassword === password) {
-          return { id: "admin", email, name: "Walker Sports Academy" };
+        if (email && password && givenEmail === email && givenPassword === password) {
+          return { id: "admin", email, name: "Walker Sports Academy", role: "admin" as const, coachName: null };
         }
-        return null;
+        const { prisma } = await import("@/lib/prisma");
+        const { verifyPassword } = await import("@/lib/password");
+        const staff = await prisma.staffUser.findUnique({
+          where: { email: givenEmail.trim().toLowerCase() },
+        });
+        if (!staff) return null;
+        const matches = await verifyPassword(givenPassword, staff.passwordHash);
+        if (!matches) return null;
+        return {
+          id: staff.id,
+          email: staff.email,
+          name: staff.name,
+          role: "coach" as const,
+          coachName: staff.coachName,
+        };
       },
     }),
   ],

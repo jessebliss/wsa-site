@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export const metadata = { title: "Admin login" };
+export const metadata = { title: "Staff login" };
 
 export default async function LoginPage({
   searchParams,
@@ -14,8 +14,8 @@ export default async function LoginPage({
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4">
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Walker Sports Academy</p>
-      <h1 className="font-display text-4xl uppercase">Admin login</h1>
-      <p className="mt-2 text-sm text-muted-foreground">One login for the academy. Parents do not use this page.</p>
+      <h1 className="font-display text-4xl uppercase">Staff login</h1>
+      <p className="mt-2 text-sm text-muted-foreground">Coaches and the academy admin sign in here. Parents do not use this page.</p>
       <form action={login} className="mt-6 space-y-4">
         <div>
           <Label htmlFor="email">Email</Label>

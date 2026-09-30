@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { logout } from "@/app/admin/(panel)/actions";
+import { auth } from "@/lib/auth";
 
-const links = [
+const adminLinks = [
   ["Overview", "/admin"],
   ["Schedule", "/admin/schedule"],
   ["Plans", "/admin/plans"],
@@ -10,14 +11,19 @@ const links = [
   ["Promo codes", "/admin/promos"],
   ["Waiver", "/admin/waiver"],
   ["Messages", "/admin/contacts"],
+  ["Coaches", "/admin/coaches"],
 ];
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const session = await auth();
+  const coach = session?.user?.role === "coach";
+  const links = coach ? [["Availability", "/admin/availability"]] : adminLinks;
+
   return (
     <div className="min-h-screen">
       <div className="bg-ink text-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <p className="font-display text-xl uppercase">WSA admin</p>
+          <p className="font-display text-xl uppercase">{coach ? "WSA coach" : "WSA admin"}</p>
           <form action={logout}>
             <button className="text-sm font-semibold" type="submit">Log out</button>
           </form>

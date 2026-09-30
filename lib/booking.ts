@@ -1,4 +1,6 @@
+import { hoursCoveredBySession } from "@/lib/availability";
 import { prisma } from "@/lib/prisma";
+import { etDayKey } from "@/lib/time";
 import { normalizeEmail } from "@/lib/utils";
 import type { PromoCode, TrainingSession } from "@prisma/client";
 
@@ -47,11 +49,25 @@ async function lockSession(tx: Pick<typeof prisma, "$queryRaw">, sessionId: stri
   await tx.$queryRaw`SELECT id FROM sessions WHERE id = ${sessionId} FOR UPDATE`;
 }
 
+async function assertCoachOpen(session: TrainingSession, tx: typeof prisma) {
+  if (!session.coach) return;
+  const staff = await tx.staffUser.findUnique({ where: { coachName: session.coach } });
+  if (!staff) return;
+  const day = await tx.coachDay.findUnique({
+    where: { staffUserId_dayKey: { staffUserId: staff.id, dayKey: etDayKey(session.startsAt) } },
+  });
+  const covered = hoursCoveredBySession(session.startsAt, session.endsAt);
+  if (!day || day.unavailable || !covered.every((hour) => day.hours.includes(hour))) {
+    throw new BookingError("That coach is not available for this session.");
+  }
+}
+
 async function assertBookable(session: TrainingSession, email: string, now: Date, tx: typeof prisma) {
   if (session.status !== "SCHEDULED") throw new BookingError("This session is not available.");
   if (session.startsAt.getTime() <= now.getTime()) {
     throw new BookingError("This session has already started.");
   }
+  await assertCoachOpen(session, tx);
   const existing = await tx.registration.findFirst({
     where: {
       sessionId: session.id,

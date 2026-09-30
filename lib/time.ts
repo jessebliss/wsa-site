@@ -97,3 +97,23 @@ export function dayStripLabel(key: string) {
 export function addMinutes(date: Date, minutes: number) {
   return new Date(date.getTime() + minutes * 60 * 1000);
 }
+
+export function shiftMonth(monthKey: string, delta: number) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1 + delta, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+export function dayKeysForMonth(monthKey: string) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const count = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const keys: string[] = [];
+  for (let day = 1; day <= count; day += 1) {
+    keys.push(`${monthKey}-${String(day).padStart(2, "0")}`);
+  }
+  return keys;
+}
+
+export function formatMonthLabel(monthKey: string) {
+  return formatEt(etToUtc(`${monthKey}-15`, "12:00"), { month: "long", year: "numeric" });
+}
