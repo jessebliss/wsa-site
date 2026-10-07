@@ -130,7 +130,8 @@ export function PublicSchedule({
     else setStep(1);
   }
 
-  const question = step === 1 ? "What do you want?" : step === 2 ? "Who do you want?" : "When?";
+  const question =
+    step === 1 ? "Choose your training" : step === 2 ? "Choose your coach" : day ? "Choose a time" : "Choose a day";
   const trail = [offering?.label, step === 3 ? coach : ""].filter(Boolean).join(" · ");
 
   return (
