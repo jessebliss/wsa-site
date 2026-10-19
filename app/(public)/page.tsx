@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { occupiedCounts } from "@/lib/booking";
 import { formatMoney } from "@/lib/money";
 import { loadOpenings } from "@/lib/openings";
+import { isPrivateQuarterback } from "@/lib/private-quarterback";
+import { loadPrivateQuarterbackPrices, privateQuarterbackCoachNames } from "@/lib/private-quarterback-data";
 import { etDayKey, etToUtc, shiftMonth } from "@/lib/time";
 import { PublicSchedule } from "@/components/public-schedule";
 
@@ -28,6 +30,15 @@ export default async function SchedulePage() {
     loadOpenings(todayKey, etDayKey(new Date(rangeEnd.getTime() - 60 * 1000))),
   ]);
   const counts = await occupiedCounts(sessions.map((session) => session.id));
+  const privateCoachNames = privateQuarterbackCoachNames(
+    sessions
+      .filter((session) => {
+        if (!session.coach || !isPrivateQuarterback(session)) return false;
+        return session.capacity - (counts.get(session.id) ?? 0) > 0;
+      })
+      .map((session) => session.coach as string),
+  );
+  const privatePrices = await loadPrivateQuarterbackPrices(privateCoachNames);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
@@ -43,6 +54,8 @@ export default async function SchedulePage() {
         maxMonth={maxMonth}
         openings={openings}
         portraits={Object.fromEntries(coaches.map((coach) => [coach.name, coach.photo]))}
+        nowIso={new Date().toISOString()}
+        privateCoaches={privateCoachNames.map((name) => ({ name, priceCents: privatePrices[name] ?? 0 }))}
         sessions={sessions.map((session) => ({
           id: session.id,
           kind: session.kind,

@@ -2,10 +2,20 @@
 
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
+import { useFormStatus } from "react-dom";
+import { bookPrivateQuarterbackHour } from "@/app/(public)/private-lesson";
 import { MonthCalendar } from "@/components/month-calendar";
 import { Badge } from "@/components/ui/badge";
 import { type OpeningsByCoach } from "@/lib/availability";
 import { formatMoney } from "@/lib/money";
+import {
+  PRIVATE_QUARTERBACK_KEY,
+  PRIVATE_QUARTERBACK_LABEL,
+  coachHasLogin,
+  openPrivateHours,
+  type OpenPrivateHour,
+  type PrivateHourSession,
+} from "@/lib/private-quarterback";
 import { offeringKey, offeringLabel, offeringRank, openSessions, sessionsOnDay } from "@/lib/schedule-filter";
 import { dayKeysForMonth, etDayKey, etToUtc, formatEt, formatEtTime } from "@/lib/time";
 
@@ -38,6 +48,36 @@ function initials(name: string) {
     .join("");
 }
 
+export type PrivateCoachChoice = {
+  name: string;
+  priceCents: number;
+};
+
+function HourButton({ slot, priceCents }: { slot: OpenPrivateHour; priceCents: number }) {
+  const { pending } = useFormStatus();
+  const start = new Date(slot.startsAt);
+  const end = new Date(slot.endsAt);
+  return (
+    <button
+      type="submit"
+      data-hour={slot.hour}
+      disabled={pending}
+      className="block w-full rounded-2xl border border-border bg-white p-4 text-left shadow-sm disabled:opacity-60"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <Badge>Private</Badge>
+          <h4 className="mt-2 font-display text-2xl uppercase leading-none">Quarterback Training</h4>
+        </div>
+        <p className="text-right font-display text-2xl">{formatMoney(priceCents)}</p>
+      </div>
+      <p className="mt-3 text-sm">
+        {pending ? "Opening checkout" : `${formatEtTime(start)}–${formatEtTime(end)} ET`}
+      </p>
+    </button>
+  );
+}
+
 export function PublicSchedule({
   sessions,
   todayKey,
@@ -45,6 +85,8 @@ export function PublicSchedule({
   maxMonth,
   openings,
   portraits,
+  privateCoaches,
+  nowIso,
   children,
 }: {
   sessions: ScheduleSession[];
@@ -53,6 +95,8 @@ export function PublicSchedule({
   maxMonth: string;
   openings: OpeningsByCoach;
   portraits: Record<string, string>;
+  privateCoaches: PrivateCoachChoice[];
+  nowIso: string;
   children?: ReactNode;
 }) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -61,6 +105,7 @@ export function PublicSchedule({
   const [month, setMonth] = useState(currentMonth);
   const [day, setDay] = useState("");
 
+  const now = useMemo(() => new Date(nowIso), [nowIso]);
   const bookable = useMemo(() => openSessions(sessions, openings), [sessions, openings]);
   const offerings = useMemo(() => {
     const rows = new Map<string, { id: string; label: string; rank: number }>();
@@ -68,8 +113,11 @@ export function PublicSchedule({
       const id = offeringKey(session);
       if (!rows.has(id)) rows.set(id, { id, label: offeringLabel(session), rank: offeringRank(session) });
     }
+    if (privateCoaches.length > 0 && !rows.has(PRIVATE_QUARTERBACK_KEY)) {
+      rows.set(PRIVATE_QUARTERBACK_KEY, { id: PRIVATE_QUARTERBACK_KEY, label: PRIVATE_QUARTERBACK_LABEL, rank: 0 });
+    }
     return Array.from(rows.values()).sort((a, b) => a.rank - b.rank || a.label.localeCompare(b.label));
-  }, [bookable]);
+  }, [bookable, privateCoaches.length]);
 
   const coachesForOffering = useMemo(() => {
     const order = Object.keys(portraits);
@@ -90,20 +138,42 @@ export function PublicSchedule({
   }, [bookable, offeringId, portraits]);
 
   const offering = offerings.find((item) => item.id === offeringId);
+  const privateBooking = offeringId === PRIVATE_QUARTERBACK_KEY;
+  const usesAvailability = privateBooking && coachHasLogin(openings, coach);
   const chosen = bookable.filter((session) => offeringKey(session) === offeringId && session.coach === coach);
+  const privatePrice = privateCoaches.find((person) => person.name === coach)?.priceCents ?? 0;
   const monthDays = useMemo(() => dayKeysForMonth(month), [month]);
   const counts = useMemo(() => {
     const tally: Record<string, number> = {};
+    if (usesAvailability) {
+      const slots = sessions as PrivateHourSession[];
+      for (const key of monthDays) {
+        if (key < todayKey) continue;
+        const open = openPrivateHours({ coach, dayKey: key, openings, sessions: slots, now });
+        if (open.length > 0) tally[key] = open.length;
+      }
+      return tally;
+    }
     for (const session of chosen) {
       const key = etDayKey(new Date(session.startsAt));
       if (!monthDays.includes(key) || key < todayKey) continue;
       tally[key] = (tally[key] ?? 0) + 1;
     }
     return tally;
-  }, [chosen, monthDays, todayKey]);
+  }, [usesAvailability, coach, openings, sessions, now, chosen, monthDays, todayKey]);
   const daySessions = sessionsOnDay(chosen, day).sort(
     (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
   );
+  const dayHours = useMemo(() => {
+    if (!usesAvailability || !day) return [];
+    return openPrivateHours({
+      coach,
+      dayKey: day,
+      openings,
+      sessions: sessions as PrivateHourSession[],
+      now,
+    });
+  }, [usesAvailability, day, coach, openings, sessions, now]);
 
   function pickOffering(id: string) {
     if (id !== offeringId) {
@@ -174,7 +244,11 @@ export function PublicSchedule({
 
         {step === 2 ? (
           <div className="mt-4 grid gap-3">
-            {coachesForOffering.map((person) => (
+            {(privateBooking ? privateCoaches.map((person) => ({
+              name: person.name,
+              price: formatMoney(person.priceCents),
+              photo: portraits[person.name] ?? "",
+            })) : coachesForOffering).map((person) => (
               <button
                 key={person.name}
                 type="button"
@@ -219,7 +293,28 @@ export function PublicSchedule({
             {Object.keys(counts).length === 0 ? (
               <p className="mt-4 text-sm text-muted-foreground">No open days this month.</p>
             ) : null}
-            {day ? (
+            {day && usesAvailability ? (
+              <>
+                <h3 className="mt-4 font-display text-2xl uppercase">
+                  {formatEt(etToUtc(day, "12:00"), { weekday: "long", month: "long", day: "numeric" })}
+                </h3>
+                <div className="mt-3 space-y-3" data-times="hours">
+                  {dayHours.map((slot) => {
+                    const existing = sessions.find((session) => session.id === slot.sessionId);
+                    const priceCents = existing?.priceCents ?? privatePrice;
+                    return (
+                      <form key={slot.hour} action={bookPrivateQuarterbackHour}>
+                        <input type="hidden" name="coach" value={coach} />
+                        <input type="hidden" name="day" value={day} />
+                        <input type="hidden" name="hour" value={slot.hour} />
+                        <HourButton slot={slot} priceCents={priceCents} />
+                      </form>
+                    );
+                  })}
+                </div>
+              </>
+            ) : null}
+            {day && !usesAvailability ? (
               <>
                 <h3 className="mt-4 font-display text-2xl uppercase">
                   {formatEt(etToUtc(day, "12:00"), { weekday: "long", month: "long", day: "numeric" })}
