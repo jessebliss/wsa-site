@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { occupiedCounts } from "@/lib/booking";
 import { formatMoney } from "@/lib/money";
 import { loadOpenings } from "@/lib/openings";
-import { isPrivateQuarterback } from "@/lib/private-quarterback";
+import { isPrivateQuarterback, matchCoachName } from "@/lib/private-quarterback";
 import { loadPrivateQuarterbackPrices, privateQuarterbackCoachNames } from "@/lib/private-quarterback-data";
 import { etDayKey, etToUtc, shiftMonth } from "@/lib/time";
 import { PublicSchedule } from "@/components/public-schedule";
@@ -43,11 +43,11 @@ export default async function SchedulePage({
       })
       .map((session) => session.coach as string),
   );
-  const linkedCoach = query.training === "quarterback" ? (query.coach ?? "").trim() : "";
-  if (linkedCoach && !privateCoachNames.includes(linkedCoach)) privateCoachNames.push(linkedCoach);
   for (const name of Object.keys(openings)) {
     if (!privateCoachNames.includes(name)) privateCoachNames.push(name);
   }
+  const linkedCoach = query.training === "quarterback" ? matchCoachName(query.coach ?? "", privateCoachNames) : "";
+  if (linkedCoach && !privateCoachNames.includes(linkedCoach)) privateCoachNames.push(linkedCoach);
   const privatePrices = await loadPrivateQuarterbackPrices(privateCoachNames);
 
   return (

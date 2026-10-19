@@ -9,6 +9,13 @@ export const PRIVATE_QUARTERBACK_KEY = "private:quarterback";
 /** Coaches who give individual quarterback lessons, in schedule order. */
 export const QUARTERBACK_COACHES = ["Ryan Walker", "Matt Considine", "Jim McLeod", "Tannor Watson"] as const;
 
+/** Match a booking-link coach to a known name. Unknown names stay as typed. */
+export function matchCoachName(requested: string, names: readonly string[]) {
+  const needle = requested.trim().replace(/\s+/g, " ").toLowerCase();
+  if (!needle) return "";
+  return names.find((name) => name.trim().toLowerCase() === needle) ?? requested.trim().replace(/\s+/g, " ");
+}
+
 const FALLBACK_CENTS: Record<string, number> = {
   "Ryan Walker": 12500,
   "Matt Considine": 8000,

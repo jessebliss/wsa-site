@@ -49,6 +49,10 @@ function initials(name: string) {
     .join("");
 }
 
+function possessive(name: string) {
+  return /s$/i.test(name) ? `${name}'` : `${name}'s`;
+}
+
 export type PrivateCoachChoice = {
   name: string;
   priceCents: number;
@@ -213,8 +217,9 @@ export function PublicSchedule({
   }
 
   const question =
-    step === 1 ? "Choose your training" : step === 2 ? "Choose your coach" : day ? "Choose a time" : "Choose a day";
-  const trail = [offering?.label, step === 3 ? coach : ""].filter(Boolean).join(" · ");
+    step === 1 ? "Choose your training" : step === 2 ? "Choose your coach" : day ? "Choose a time" : coach ? `${possessive(coach)} calendar` : "Choose a day";
+  const trail = offering && step > 1 ? offering.label : "";
+  const coachPhoto = portraits[coach] ?? "";
   const groupSchedule = useMemo(() => {
     const rows = sessions
       .filter((session) => session.kind === "GROUP" && session.program !== INTRO_LABEL)
@@ -283,6 +288,22 @@ export function PublicSchedule({
             )}
           </div>
         ) : null}
+        {step === 3 && coach ? (
+          <div data-selected-coach={coach} className="mt-4 flex items-center gap-4 rounded-2xl border-2 border-primary bg-white p-4">
+            {coachPhoto ? (
+              <img src={coachPhoto} alt="" className="h-16 w-16 shrink-0 rounded-full object-cover object-top" />
+            ) : (
+              <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-muted font-display text-xl">
+                {initials(coach)}
+              </span>
+            )}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Selected coach</p>
+              <p className="font-display text-3xl uppercase leading-none">{coach}</p>
+              <p className="mt-1 text-sm">You&apos;re on {possessive(coach)} calendar.</p>
+            </div>
+          </div>
+        ) : null}
         <h2 className="mt-4 font-display text-4xl uppercase leading-none">{question}</h2>
         {trail ? <p className="mt-2 text-sm text-muted-foreground">{trail}</p> : null}
         {introBooking ? <p className="mt-2 max-w-2xl text-sm">{INTRO_NOTE} The price is $125.</p> : null}
@@ -330,8 +351,9 @@ export function PublicSchedule({
                 type="button"
                 data-coach={person.name}
                 data-price={person.price}
+                aria-pressed={person.name === coach}
                 onClick={() => pickCoach(person.name)}
-                className="flex min-h-20 items-center gap-4 rounded-2xl bg-white p-3 text-left"
+                className={`flex min-h-20 items-center gap-4 rounded-2xl bg-white p-3 text-left ${person.name === coach ? "ring-2 ring-primary" : ""}`}
               >
                 {person.photo ? (
                   <img src={person.photo} alt="" className="h-16 w-16 shrink-0 rounded-full object-cover object-top" />
@@ -340,10 +362,13 @@ export function PublicSchedule({
                     {initials(person.name)}
                   </span>
                 )}
-                <span>
+                <span className="min-w-0 flex-1">
                   <span className="block font-display text-2xl uppercase leading-none">{person.name}</span>
                   <span className="mt-1 block text-sm font-semibold">{person.price}</span>
                 </span>
+                {person.name === coach ? (
+                  <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-primary">Selected</span>
+                ) : null}
               </button>
             ))}
           </div>
