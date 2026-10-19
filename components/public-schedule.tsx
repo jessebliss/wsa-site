@@ -7,6 +7,7 @@ import { bookPrivateQuarterbackHour } from "@/app/(public)/private-lesson";
 import { MonthCalendar } from "@/components/month-calendar";
 import { Badge } from "@/components/ui/badge";
 import { type OpeningsByCoach } from "@/lib/availability";
+import { INTRO_KEY, INTRO_LABEL, INTRO_NOTE, INTRO_PRICE_CENTS } from "@/lib/intro";
 import { formatMoney } from "@/lib/money";
 import {
   PRIVATE_QUARTERBACK_KEY,
@@ -17,7 +18,7 @@ import {
   type PrivateHourSession,
 } from "@/lib/private-quarterback";
 import { offeringKey, offeringLabel, offeringRank, openSessions, sessionsOnDay } from "@/lib/schedule-filter";
-import { dayKeysForMonth, etDayKey, etToUtc, formatEt, formatEtTime } from "@/lib/time";
+import { dayKeysForMonth, etDayKey, etToUtc, formatEt, formatEtDate, formatEtTime } from "@/lib/time";
 
 export type ScheduleSession = {
   id: string;
@@ -87,6 +88,9 @@ export function PublicSchedule({
   portraits,
   privateCoaches,
   nowIso,
+  initialOffering = "",
+  initialCoach = "",
+  initialStep = 1,
   children,
 }: {
   sessions: ScheduleSession[];
@@ -97,11 +101,15 @@ export function PublicSchedule({
   portraits: Record<string, string>;
   privateCoaches: PrivateCoachChoice[];
   nowIso: string;
+  initialOffering?: string;
+  initialCoach?: string;
+  initialStep?: 1 | 2 | 3;
   children?: ReactNode;
 }) {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [offeringId, setOfferingId] = useState("");
-  const [coach, setCoach] = useState("");
+  const [step, setStep] = useState<1 | 2 | 3>(initialStep);
+  const [offeringId, setOfferingId] = useState(initialOffering);
+  const [coach, setCoach] = useState(initialCoach);
+  const [showGroups, setShowGroups] = useState(false);
   const [month, setMonth] = useState(currentMonth);
   const [day, setDay] = useState("");
 
@@ -115,6 +123,9 @@ export function PublicSchedule({
     }
     if (privateCoaches.length > 0 && !rows.has(PRIVATE_QUARTERBACK_KEY)) {
       rows.set(PRIVATE_QUARTERBACK_KEY, { id: PRIVATE_QUARTERBACK_KEY, label: PRIVATE_QUARTERBACK_LABEL, rank: 0 });
+    }
+    if (!rows.has(INTRO_KEY)) {
+      rows.set(INTRO_KEY, { id: INTRO_KEY, label: INTRO_LABEL, rank: 2 });
     }
     return Array.from(rows.values()).sort((a, b) => a.rank - b.rank || a.label.localeCompare(b.label));
   }, [bookable, privateCoaches.length]);
@@ -139,6 +150,7 @@ export function PublicSchedule({
 
   const offering = offerings.find((item) => item.id === offeringId);
   const privateBooking = offeringId === PRIVATE_QUARTERBACK_KEY;
+  const introBooking = offeringId === INTRO_KEY;
   const usesAvailability = privateBooking && coachHasLogin(openings, coach);
   const chosen = bookable.filter((session) => offeringKey(session) === offeringId && session.coach === coach);
   const privatePrice = privateCoaches.find((person) => person.name === coach)?.priceCents ?? 0;
@@ -203,13 +215,38 @@ export function PublicSchedule({
   const question =
     step === 1 ? "Choose your training" : step === 2 ? "Choose your coach" : day ? "Choose a time" : "Choose a day";
   const trail = [offering?.label, step === 3 ? coach : ""].filter(Boolean).join(" · ");
+  const groupSchedule = useMemo(() => {
+    const rows = sessions
+      .filter((session) => session.kind === "GROUP" && session.program !== INTRO_LABEL)
+      .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+    const byDay = new Map<string, ScheduleSession[]>();
+    for (const session of rows) {
+      const key = etDayKey(new Date(session.startsAt));
+      const list = byDay.get(key) ?? [];
+      list.push(session);
+      byDay.set(key, list);
+    }
+    return Array.from(byDay.entries());
+  }, [sessions]);
 
   return (
     <>
       <section id="schedule" className="mt-6 scroll-mt-24" data-step={step}>
-        <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          aria-expanded={showGroups}
+          onClick={() => setShowGroups((open) => !open)}
+          className="inline-flex min-h-12 items-center rounded-full bg-primary px-5 text-sm font-semibold text-white"
+        >
+          {showGroups ? "Hide group schedule" : "Group schedule"}
+        </button>
+        <div className="mt-4 flex items-center justify-between gap-3">
           {step > 1 ? (
-            <button type="button" onClick={back} className="min-h-11 px-1 text-sm font-semibold">
+            <button
+              type="button"
+              onClick={back}
+              className="inline-flex min-h-12 items-center rounded-full bg-ink px-5 text-base font-semibold text-white"
+            >
               Back
             </button>
           ) : (
@@ -217,8 +254,38 @@ export function PublicSchedule({
           )}
           <p className="text-sm text-muted-foreground">{step} of 3</p>
         </div>
-        <h2 className="font-display text-4xl uppercase leading-none">{question}</h2>
+        {showGroups ? (
+          <div className="mt-4 rounded-2xl bg-white p-4" data-group-schedule="open">
+            <h2 className="font-display text-3xl uppercase">Group schedule</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Upcoming group training. Booking is still the steps below.</p>
+            {groupSchedule.length === 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground">No group sessions are on the calendar yet.</p>
+            ) : (
+              <div className="mt-4 space-y-5">
+                {groupSchedule.map(([dayKey, rows]) => (
+                  <div key={dayKey} data-group-day={dayKey}>
+                    <h3 className="font-display text-xl uppercase">{formatEtDate(etToUtc(dayKey, "12:00"))}</h3>
+                    <ul className="mt-2 space-y-3">
+                      {rows.map((session) => (
+                        <li key={session.id} className="border-t border-border pt-3 text-sm">
+                          <p className="font-semibold">{session.title}</p>
+                          <p>
+                            {formatEtTime(new Date(session.startsAt))}–{formatEtTime(new Date(session.endsAt))} ET
+                            {session.coach ? ` · ${session.coach}` : ""}
+                          </p>
+                          <p className="text-muted-foreground">{session.location}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
+        <h2 className="mt-4 font-display text-4xl uppercase leading-none">{question}</h2>
         {trail ? <p className="mt-2 text-sm text-muted-foreground">{trail}</p> : null}
+        {introBooking ? <p className="mt-2 max-w-2xl text-sm">{INTRO_NOTE} The price is $125.</p> : null}
 
         {step === 1 ? (
           offerings.length === 0 ? (
@@ -233,22 +300,31 @@ export function PublicSchedule({
                   type="button"
                   data-offering={item.label}
                   onClick={() => pickOffering(item.id)}
-                  className="min-h-14 rounded-2xl bg-white px-4 py-4 text-left font-display text-2xl uppercase leading-none"
+                  className="min-h-14 rounded-2xl bg-white px-4 py-4 text-left"
                 >
-                  {item.label}
+                  <span className="block font-display text-2xl uppercase leading-none">{item.label}</span>
+                  {item.id === INTRO_KEY ? (
+                    <span className="mt-2 block text-sm normal-case leading-snug text-muted-foreground">{INTRO_NOTE} $125.</span>
+                  ) : null}
                 </button>
               ))}
             </div>
           )
         ) : null}
 
-        {step === 2 ? (
+        {step === 2 && introBooking && coachesForOffering.length === 0 ? (
+          <p className="mt-4 rounded-2xl bg-white p-5 text-sm text-muted-foreground">None are on the calendar yet.</p>
+        ) : null}
+
+        {step === 2 && !(introBooking && coachesForOffering.length === 0) ? (
           <div className="mt-4 grid gap-3">
             {(privateBooking ? privateCoaches.map((person) => ({
               name: person.name,
               price: formatMoney(person.priceCents),
               photo: portraits[person.name] ?? "",
-            })) : coachesForOffering).map((person) => (
+            })) : coachesForOffering.map((person) => (
+              introBooking ? { ...person, price: formatMoney(INTRO_PRICE_CENTS) } : person
+            ))).map((person) => (
               <button
                 key={person.name}
                 type="button"
@@ -331,7 +407,7 @@ export function PublicSchedule({
                           <Badge>{session.kind === "GROUP" ? "Group" : session.kind === "CAMP" ? "Camp" : "Private"}</Badge>
                           <h4 className="mt-2 font-display text-2xl uppercase leading-none">{session.title}</h4>
                         </div>
-                        <p className="text-right font-display text-2xl">{formatMoney(session.priceCents)}</p>
+                        <p className="text-right font-display text-2xl">{formatMoney(introBooking ? INTRO_PRICE_CENTS : session.priceCents)}</p>
                       </div>
                       <div className="mt-3 flex items-end justify-between gap-3 text-sm">
                         <p>

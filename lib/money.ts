@@ -8,13 +8,18 @@ export function formatMoney(cents: number) {
 }
 
 export function dollarsToCents(value: string) {
-  const trimmed = value.trim();
-  if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) {
-    throw new Error("Enter a price in dollars, like 40 or 125.00.");
-  }
-  const cents = Math.round(Number(trimmed) * 100);
+  const cents = optionalDollarsToCents(value);
   if (cents <= 0) throw new Error("Price has to be more than zero.");
   return cents;
+}
+
+export function optionalDollarsToCents(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return 0;
+  if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) {
+    throw new Error("Enter a price in dollars, like 0, 5, or 12.50.");
+  }
+  return Math.round(Number(trimmed) * 100);
 }
 
 export function centsToDollarInput(cents: number) {

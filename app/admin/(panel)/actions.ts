@@ -5,7 +5,9 @@ import { redirect } from "next/navigation";
 import { auth, signOut } from "@/lib/auth";
 import { refundRegistration } from "@/lib/billing";
 import { ensurePlanStripePrice } from "@/lib/billing";
-import { dollarsToCents } from "@/lib/money";
+import { dollarsToCents, optionalDollarsToCents } from "@/lib/money";
+import { INTRO_PRICE_CENTS, isIntro } from "@/lib/intro";
+import { percentToBps } from "@/lib/fees";
 import { prisma } from "@/lib/prisma";
 import { getStripe, stripeConfigured } from "@/lib/stripe";
 import {
@@ -146,6 +148,7 @@ export async function saveSession(formData: FormData) {
     };
     if (!data.program || !data.title || !data.location) throw new Error("Program, title, and location are required.");
     if (!Number.isInteger(data.capacity) || data.capacity < 1) throw new Error("Capacity has to be at least 1.");
+    if (isIntro(data)) data.priceCents = INTRO_PRICE_CENTS;
     if (id) {
       await prisma.trainingSession.update({ where: { id }, data });
     } else {
@@ -157,6 +160,26 @@ export async function saveSession(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/admin/schedule");
   redirect("/admin/schedule");
+}
+
+export async function saveCheckoutFees(formData: FormData) {
+  await requireAdmin();
+  try {
+    const registrationFixedCents = optionalDollarsToCents(String(formData.get("registrationFixed") ?? ""));
+    const taxFixedCents = optionalDollarsToCents(String(formData.get("taxFixed") ?? ""));
+    const registrationBps = percentToBps(String(formData.get("registrationPercent") ?? ""));
+    const taxBps = percentToBps(String(formData.get("taxPercent") ?? ""));
+    await prisma.checkoutFee.upsert({
+      where: { id: "site" },
+      create: { id: "site", registrationFixedCents, registrationBps, taxFixedCents, taxBps },
+      update: { registrationFixedCents, registrationBps, taxFixedCents, taxBps },
+    });
+  } catch (error) {
+    fail("/admin/fees", error);
+  }
+  revalidatePath("/");
+  revalidatePath("/admin/fees");
+  redirect("/admin/fees?saved=1");
 }
 
 export async function savePlan(formData: FormData) {

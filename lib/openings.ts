@@ -1,4 +1,5 @@
 import { sessionWithinOpening, type OpeningsByCoach } from "@/lib/availability";
+import { isIntro } from "@/lib/intro";
 import { prisma } from "@/lib/prisma";
 import { etDayKey } from "@/lib/time";
 
@@ -20,10 +21,12 @@ export async function loadOpenings(fromDay: string, toDay: string): Promise<Open
 }
 
 export async function coachAllowsSession(session: {
+  program: string;
   coach: string | null;
   startsAt: Date;
   endsAt: Date;
 }) {
+  if (isIntro(session)) return true;
   if (!session.coach) return true;
   const staff = await prisma.staffUser.findUnique({ where: { coachName: session.coach } });
   if (!staff) return true;

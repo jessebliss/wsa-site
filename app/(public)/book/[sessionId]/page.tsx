@@ -2,6 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CheckoutForm } from "@/components/checkout-form";
 import { countOccupied } from "@/lib/booking";
+import { chargeLines, checkoutLineItems } from "@/lib/fees";
+import { loadCheckoutFees } from "@/lib/fees-data";
+import { INTRO_PRICE_CENTS, isIntro } from "@/lib/intro";
 import { formatMoney } from "@/lib/money";
 import { coachAllowsSession } from "@/lib/openings";
 import { prisma } from "@/lib/prisma";
@@ -24,6 +27,9 @@ export default async function SessionCheckoutPage({
     where: { isCurrent: true },
     orderBy: { createdAt: "desc" },
   });
+  const listPrice = isIntro(session) ? INTRO_PRICE_CENTS : session.priceCents;
+  const charge = chargeLines(listPrice, await loadCheckoutFees());
+  const lines = checkoutLineItems(charge);
 
   return (
     <div className="mx-auto max-w-lg px-4 py-8">
@@ -35,7 +41,7 @@ export default async function SessionCheckoutPage({
       {session.coach ? <p className="text-sm">{session.coach}</p> : null}
       {session.description ? <p className="mt-3 text-sm leading-relaxed">{session.description}</p> : null}
       <p className="mt-3 text-sm font-semibold">
-        {spotsLeft <= 0 ? "Sold out" : `${spotsLeft} spot${spotsLeft === 1 ? "" : "s"} left`} · {formatMoney(session.priceCents)}
+        {spotsLeft <= 0 ? "Sold out" : `${spotsLeft} spot${spotsLeft === 1 ? "" : "s"} left`} · {formatMoney(listPrice)}
       </p>
       {session.kind === "GROUP" ? (
         <p className="mt-2 text-sm text-muted-foreground">
@@ -56,7 +62,8 @@ export default async function SessionCheckoutPage({
         <div className="mt-6">
           <CheckoutForm
             sessionId={session.id}
-            priceCents={session.priceCents}
+            priceCents={charge.totalCents}
+            lines={lines}
             waiver={waiver.body}
             allowPromo
           />

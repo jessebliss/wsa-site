@@ -1,9 +1,12 @@
 import { createCoach } from "@/app/admin/(panel)/actions";
 import { AdminError } from "@/components/admin-error";
+import { CoachQrCard } from "@/components/coach-qr";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { QUARTERBACK_COACHES } from "@/lib/private-quarterback";
 import { prisma } from "@/lib/prisma";
+import { publicOrigin } from "@/lib/site-origin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Coaches" };
@@ -14,6 +17,7 @@ export default async function CoachesPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const params = await searchParams;
+  const origin = await publicOrigin();
   const [coaches, scheduleCoaches] = await Promise.all([
     prisma.staffUser.findMany({ orderBy: { name: "asc" } }),
     prisma.trainingSession.findMany({
@@ -24,6 +28,10 @@ export default async function CoachesPage({
     }),
   ]);
   const names = scheduleCoaches.map((session) => session.coach).filter((name): name is string => Boolean(name));
+  const qrNames = [...QUARTERBACK_COACHES] as string[];
+  for (const coach of coaches) {
+    if (!qrNames.includes(coach.coachName)) qrNames.push(coach.coachName);
+  }
 
   return (
     <div>
@@ -58,6 +66,15 @@ export default async function CoachesPage({
           <Button type="submit">Create coach login</Button>
         </div>
       </form>
+      <h2 className="mt-8 font-display text-3xl uppercase">QR codes</h2>
+      <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+        Each code opens Quarterback Training with that coach already selected. The parent picks a day and a time, then checks out. A coach with a login also sees their code there.
+      </p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {qrNames.map((name) => (
+          <CoachQrCard key={name} coach={name} origin={origin} />
+        ))}
+      </div>
       <ul className="mt-6 space-y-2">
         {coaches.length === 0 ? <li className="text-sm text-muted-foreground">No coach logins yet.</li> : null}
         {coaches.map((coach) => (

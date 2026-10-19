@@ -1,4 +1,5 @@
 import { sessionWithinOpening, type OpeningsByCoach } from "@/lib/availability";
+import { INTRO_KEY, INTRO_LABEL, isIntro } from "@/lib/intro";
 import {
   GROUP_QUARTERBACK_LABEL,
   PRIVATE_QUARTERBACK_KEY,
@@ -19,12 +20,14 @@ type OfferingSession = {
  * Other sessions are one choice per program, not per coach.
  */
 export function offeringKey(session: OfferingSession) {
+  if (isIntro(session)) return INTRO_KEY;
   if (session.kind === "CAMP") return `camp:${session.title}`;
   if (isPrivateQuarterback(session)) return PRIVATE_QUARTERBACK_KEY;
   return `program:${session.program}`;
 }
 
 export function offeringLabel(session: OfferingSession) {
+  if (isIntro(session)) return INTRO_LABEL;
   if (session.kind === "CAMP") return session.title;
   if (isPrivateQuarterback(session)) return PRIVATE_QUARTERBACK_LABEL;
   if (session.program === QUARTERBACK_PROGRAM) return GROUP_QUARTERBACK_LABEL;
@@ -33,6 +36,7 @@ export function offeringLabel(session: OfferingSession) {
 
 export function offeringRank(session: OfferingSession) {
   if (isPrivateQuarterback(session)) return 0;
+  if (isIntro(session)) return 2;
   if (session.kind === "CAMP") return 40;
   if (session.program === QUARTERBACK_PROGRAM) return 1;
   if (session.program === "Speed & Agility") return 10;
@@ -44,7 +48,11 @@ export function openSessions<T extends OfferingSession & { coach: string | null;
   sessions: T[],
   openings: OpeningsByCoach,
 ) {
-  return sessions.filter((session) => session.spotsLeft > 0 && sessionWithinOpening(session, openings));
+  return sessions.filter((session) => {
+    if (session.spotsLeft <= 0) return false;
+    if (isIntro(session)) return true;
+    return sessionWithinOpening(session, openings);
+  });
 }
 
 export function sessionsOnDay<T extends { startsAt: string }>(sessions: T[], dayKey: string) {

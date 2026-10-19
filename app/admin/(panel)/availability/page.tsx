@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { CoachAvailability } from "@/components/coach-availability";
+import { CoachQrCard } from "@/components/coach-qr";
 import { AdminError } from "@/components/admin-error";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { publicOrigin } from "@/lib/site-origin";
 import { dayKeysForMonth, etDayKey, shiftMonth } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +35,7 @@ export default async function AvailabilityPage({
   const saved: Record<string, { unavailable: boolean; hours: number[] }> = {};
   for (const day of days) saved[day.dayKey] = { unavailable: day.unavailable, hours: day.hours };
   const initialDay = params.day && monthDays.includes(params.day) && params.day >= todayKey ? params.day : todayKey.startsWith(month) ? todayKey : monthDays[0];
+  const origin = await publicOrigin();
 
   return (
     <div>
@@ -40,6 +43,11 @@ export default async function AvailabilityPage({
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
         Eastern Time. This month is the earliest you can open. Pick a day, turn hours on or off, then save that day. Not available closes the whole day and clears its hours. Sunday and Saturday run 8 AM–5 PM, Monday through Wednesday 9 AM–9 PM, and Thursday and Friday 9 AM–5 PM.
       </p>
+      {session.user.coachName ? (
+        <div className="mt-4 max-w-sm">
+          <CoachQrCard coach={session.user.coachName} origin={origin} />
+        </div>
+      ) : null}
       <div className="mt-4">
         <AdminError message={params.error} />
         <CoachAvailability

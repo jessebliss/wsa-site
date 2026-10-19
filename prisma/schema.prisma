@@ -147,6 +147,8 @@ model Registration {
   kind                    RegistrationKind
   paymentStatus           PaymentStatus    @default(PENDING)
   amountCents             Int
+  registrationCents       Int              @default(0)
+  taxCents                Int              @default(0)
   stripeCheckoutSessionId String?          @unique
   stripePaymentIntentId   String?
   promoCodeId             String?
@@ -166,6 +168,17 @@ model Registration {
   @@index([createdAt])
   @@index([stripePaymentIntentId])
   @@map("registrations")
+}
+
+model CheckoutFee {
+  id                     String   @id @default("site")
+  registrationFixedCents Int      @default(0)
+  registrationBps        Int      @default(0)
+  taxFixedCents          Int      @default(0)
+  taxBps                 Int      @default(0)
+  updatedAt              DateTime @updatedAt
+
+  @@map("checkout_fees")
 }
 
 model PromoCode {

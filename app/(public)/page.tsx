@@ -12,7 +12,12 @@ import { PublicSchedule } from "@/components/public-schedule";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Schedule" };
 
-export default async function SchedulePage() {
+export default async function SchedulePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ training?: string; coach?: string }>;
+}) {
+  const query = await searchParams;
   const todayKey = etDayKey(new Date());
   const currentMonth = todayKey.slice(0, 7);
   const maxMonth = shiftMonth(currentMonth, 5);
@@ -38,6 +43,11 @@ export default async function SchedulePage() {
       })
       .map((session) => session.coach as string),
   );
+  const linkedCoach = query.training === "quarterback" ? (query.coach ?? "").trim() : "";
+  if (linkedCoach && !privateCoachNames.includes(linkedCoach)) privateCoachNames.push(linkedCoach);
+  for (const name of Object.keys(openings)) {
+    if (!privateCoachNames.includes(name)) privateCoachNames.push(name);
+  }
   const privatePrices = await loadPrivateQuarterbackPrices(privateCoachNames);
 
   return (
@@ -55,6 +65,9 @@ export default async function SchedulePage() {
         openings={openings}
         portraits={Object.fromEntries(coaches.map((coach) => [coach.name, coach.photo]))}
         nowIso={new Date().toISOString()}
+        initialOffering={linkedCoach ? "private:quarterback" : ""}
+        initialCoach={linkedCoach}
+        initialStep={linkedCoach ? 3 : 1}
         privateCoaches={privateCoachNames.map((name) => ({ name, priceCents: privatePrices[name] ?? 0 }))}
         sessions={sessions.map((session) => ({
           id: session.id,

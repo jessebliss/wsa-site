@@ -48,7 +48,14 @@ export default async function EditSessionPage({
           </select>
         </div>
         <Label htmlFor="program">Program</Label>
-        <Input id="program" name="program" defaultValue={session.program} required />
+        <Input id="program" name="program" list="programs" defaultValue={session.program} required />
+        <datalist id="programs">
+          <option value="Quarterback Training" />
+          <option value="QB Introduction Session" />
+          <option value="Speed & Agility" />
+          <option value="Girls Flag" />
+        </datalist>
+        <p className="text-xs text-muted-foreground">QB Introduction Session always saves at $125.</p>
         <Label htmlFor="title">Title</Label>
         <Input id="title" name="title" defaultValue={session.title} required />
         <Label htmlFor="coach">Coach</Label>

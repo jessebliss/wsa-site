@@ -4,7 +4,6 @@ import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
-  QUARTERBACK_COACHES,
   QUARTERBACK_PROGRAM,
   isPrivateQuarterback,
   privateHourBounds,
@@ -24,16 +23,8 @@ async function ensurePrivateQuarterbackHour(coach: string, dayKey: string, hour:
   const maxMonth = shiftMonth(todayKey.slice(0, 7), 5);
   if (dayKey < todayKey || dayKey.slice(0, 7) > maxMonth) return null;
 
-  const known = (QUARTERBACK_COACHES as readonly string[]).includes(coach);
   const staff = await prisma.staffUser.findUnique({ where: { coachName: coach } });
   if (!staff) return null;
-  if (!known) {
-    const prior = await prisma.trainingSession.findFirst({
-      where: { coach, kind: "PRIVATE", program: QUARTERBACK_PROGRAM, status: "SCHEDULED" },
-      select: { id: true },
-    });
-    if (!prior) return null;
-  }
 
   const day = await prisma.coachDay.findUnique({
     where: { staffUserId_dayKey: { staffUserId: staff.id, dayKey } },

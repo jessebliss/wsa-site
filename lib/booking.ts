@@ -50,6 +50,7 @@ async function lockSession(tx: Pick<typeof prisma, "$queryRaw">, sessionId: stri
 }
 
 async function assertCoachOpen(session: TrainingSession, tx: typeof prisma) {
+  if (session.program === "QB Introduction Session") return;
   if (!session.coach) return;
   const staff = await tx.staffUser.findUnique({ where: { coachName: session.coach } });
   if (!staff) return;
@@ -202,6 +203,7 @@ export async function holdOneTime(
   sessionId: string,
   person: PersonInput,
   promo: PromoCode | null,
+  charge: { totalCents: number; registrationCents: number; taxCents: number },
 ) {
   const email = normalizeEmail(person.email);
   const now = new Date();
@@ -232,7 +234,9 @@ export async function holdOneTime(
         playerName: person.playerName,
         kind: "ONE_TIME",
         paymentStatus: "PENDING",
-        amountCents: session.priceCents,
+        amountCents: charge.totalCents,
+        registrationCents: charge.registrationCents,
+        taxCents: charge.taxCents,
         promoCodeId: promo?.id,
         waiverAcceptanceId: acceptance.id,
         holdExpiresAt: new Date(now.getTime() + HOLD_MS),

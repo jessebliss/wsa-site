@@ -43,9 +43,11 @@ export default async function ScheduleAdmin({
           <Input className="mt-1" id="program" name="program" list="programs" required placeholder="Quarterback Training" />
           <datalist id="programs">
             <option value="Quarterback Training" />
+            <option value="QB Introduction Session" />
             <option value="Speed & Agility" />
             <option value="Girls Flag" />
           </datalist>
+          <p className="mt-1 text-xs text-muted-foreground">QB Introduction Session always saves at $125.</p>
         </div>
         <div className="sm:col-span-2">
           <Label htmlFor="title">Title</Label>

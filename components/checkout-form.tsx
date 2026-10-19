@@ -7,22 +7,31 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatMoney } from "@/lib/money";
 
+export type CheckoutLine = { label: string; cents: number };
+
 export function CheckoutForm({
   sessionId,
   priceCents,
+  lines,
   waiver,
   allowPromo,
 }: {
   sessionId: string;
   priceCents: number;
+  lines: CheckoutLine[];
   waiver: string;
   allowPromo: boolean;
 }) {
   const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
-  const [priceNote, setPriceNote] = useState(`${formatMoney(priceCents)} before the card form.`);
+  const [priceNote, setPriceNote] = useState(
+    lines.some((line) => line.label !== "Session" && line.cents > 0)
+      ? `${formatMoney(priceCents)} due today.`
+      : `${formatMoney(priceCents)} before the card form.`,
+  );
   const [displayCents, setDisplayCents] = useState(priceCents);
+  const [displayLines, setDisplayLines] = useState(lines);
 
   async function quote(form: HTMLFormElement) {
     const data = new FormData(form);
@@ -36,7 +45,12 @@ export function CheckoutForm({
         promoCode: String(data.get("promoCode") ?? ""),
       }),
     });
-    const body = (await response.json()) as { error?: string; message?: string; amountCents?: number };
+    const body = (await response.json()) as {
+      error?: string;
+      message?: string;
+      amountCents?: number;
+      lines?: CheckoutLine[];
+    };
     if (!response.ok) {
       setError(body.error ?? "Could not check that price.");
       return;
@@ -44,6 +58,7 @@ export function CheckoutForm({
     setError("");
     if (body.message) setPriceNote(body.message);
     if (typeof body.amountCents === "number") setDisplayCents(body.amountCents);
+    if (body.lines) setDisplayLines(body.lines);
   }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -80,6 +95,16 @@ export function CheckoutForm({
       <div className="rounded-xl bg-ink px-4 py-3 text-white">
         <p className="text-xs uppercase tracking-[0.16em] text-white/60">Due today</p>
         <p className="font-display text-4xl">{formatMoney(displayCents)}</p>
+        {displayLines.length > 1 ? (
+          <ul className="mt-2 space-y-1 text-sm">
+            {displayLines.map((line) => (
+              <li key={line.label} className="flex justify-between gap-3">
+                <span>{line.label}</span>
+                <span>{formatMoney(line.cents)}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         <p className="text-sm text-white/80">{priceNote}</p>
       </div>
       <div>

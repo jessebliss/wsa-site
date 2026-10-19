@@ -254,10 +254,15 @@ export async function markSessionPaid(session: Stripe.Checkout.Session) {
       `Parent: ${registration.parentName}`,
       `Session: ${registration.session.title}`,
       `When: ${when} ET`,
+      `Session: ${formatMoney((session.amount_total ?? registration.amountCents) - registration.registrationCents - registration.taxCents)}`,
+      registration.registrationCents > 0 ? `Registration: ${formatMoney(registration.registrationCents)}` : "",
+      registration.taxCents > 0 ? `Tax: ${formatMoney(registration.taxCents)}` : "",
       `Amount: ${formatMoney(session.amount_total ?? registration.amountCents)}`,
       "",
       `Questions: ${ACADEMY_EMAIL} or ${ACADEMY_PHONE}`,
-    ].join("\n"),
+    ]
+      .filter((line) => line !== "")
+      .join("\n"),
   );
 }
 
