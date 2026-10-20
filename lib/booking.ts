@@ -92,7 +92,7 @@ export async function findCoveringSubscription(email: string, program: string, n
     include: { plan: true },
   });
   const matches = subs.filter((sub) => {
-    if (!sub.plan.active) return false;
+    if (!sub.plan?.active) return false;
     if (sub.plan.program !== program) return false;
     if (sub.currentPeriodEnd && sub.currentPeriodEnd.getTime() < now.getTime()) return false;
     return sub.sessionsUsed < sub.sessionsIncluded;
@@ -122,13 +122,21 @@ export async function previewCredit(emailRaw: string, sessionId: string) {
       message: "No active plan with sessions left for this program. This booking is a one-time payment.",
     };
   }
+  const plan = sub.plan;
+  if (!plan) {
+    return {
+      covered: false as const,
+      priceCents: session.priceCents,
+      message: "No active plan with sessions left for this program. This booking is a one-time payment.",
+    };
+  }
   const left = sub.sessionsIncluded - sub.sessionsUsed;
   return {
     covered: true as const,
     priceCents: 0,
-    planName: sub.plan.name,
+    planName: plan.name,
     sessionsLeft: left,
-    message: `Covered by ${sub.plan.name}. ${left} session${left === 1 ? "" : "s"} left this period.`,
+    message: `Covered by ${plan.name}. ${left} session${left === 1 ? "" : "s"} left this period.`,
   };
 }
 
@@ -149,7 +157,7 @@ export async function bookWithPlanCredit(sessionId: string, person: PersonInput)
     const sub = subs
       .filter(
         (item) =>
-          item.plan.active &&
+          item.plan?.active &&
           item.plan.program === session.program &&
           (!item.currentPeriodEnd || item.currentPeriodEnd.getTime() >= now.getTime()) &&
           item.sessionsUsed < item.sessionsIncluded,

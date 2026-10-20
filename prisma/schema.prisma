@@ -55,6 +55,11 @@ enum SubscriptionStatus {
   CANCELED
 }
 
+enum PaymentMethod {
+  STRIPE
+  VENMO
+}
+
 model Plan {
   id               String         @id @default(cuid())
   seedKey          String?        @unique
@@ -166,10 +171,13 @@ model Subscription {
   parentName           String
   phone                String
   playerName           String
-  planId               String
-  plan                 Plan               @relation(fields: [planId], references: [id])
+  planId               String?
+  plan                 Plan?              @relation(fields: [planId], references: [id], onDelete: SetNull)
+  planName             String             @default("")
   priceCents           Int
   sessionsIncluded     Int
+  paymentMethod        PaymentMethod      @default(STRIPE)
+  note                 String?
   stripeCustomerId     String?
   stripeSubscriptionId String?            @unique
   status               SubscriptionStatus @default(INCOMPLETE)
@@ -271,6 +279,14 @@ model StripeEvent {
   createdAt DateTime @default(now())
 
   @@map("stripe_events")
+}
+
+model RetiredCoach {
+  id        String   @id @default(cuid())
+  coachName String   @unique
+  createdAt DateTime @default(now())
+
+  @@map("retired_coaches")
 }
 
 model StaffUser {

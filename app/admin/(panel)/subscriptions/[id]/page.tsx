@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { centsToDollarInput, formatMoney } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
+import { subscriptionPlanName } from "@/lib/subscription-admin";
 import { formatEtDate } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -33,26 +34,43 @@ export default async function SubscriptionDetail({
       <h1 className="mt-2 font-display text-4xl uppercase">{sub.playerName}</h1>
       <p className="text-sm">{sub.parentName} · {sub.email} · {sub.phone}</p>
       <p className="mt-2 text-sm font-semibold">
-        {sub.status}{sub.cancelAtPeriodEnd ? " · cancels at period end" : ""} · {formatMoney(sub.priceCents)} / month
+        {sub.paymentMethod === "VENMO" ? "Venmo" : "Stripe"} · {sub.status}{sub.cancelAtPeriodEnd ? " · cancels at period end" : ""} · {formatMoney(sub.priceCents)} / month
       </p>
       <p className="text-sm text-muted-foreground">
-        {sub.plan.name} · {sub.sessionsUsed} of {sub.sessionsIncluded} used
+        {subscriptionPlanName(sub)} · {sub.sessionsUsed} of {sub.sessionsIncluded} used
         {sub.currentPeriodEnd ? ` · period ends ${formatEtDate(sub.currentPeriodEnd)}` : ""}
       </p>
+      {sub.note ? <p className="mt-2 text-sm">Note: {sub.note}</p> : null}
       {sub.status === "PAST_DUE" ? (
         <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-primary">Payment is past due.</p>
       ) : null}
-      {!sub.stripeSubscriptionId ? (
+      {sub.paymentMethod === "VENMO" ? (
+        <p className="mt-3 text-sm">This membership is marked Venmo. It was not created in Stripe. Canceling it stops it in this app only.</p>
+      ) : !sub.stripeSubscriptionId ? (
         <p className="mt-3 text-sm">This record is not linked to Stripe, so billing changes are unavailable.</p>
       ) : null}
       <AdminError message={query.error} />
+      {sub.paymentMethod === "VENMO" ? (
+        <div className="mt-6">
+          {sub.status === "CANCELED" ? (
+            <p className="text-sm">This Venmo membership is canceled in this app.</p>
+          ) : (
+            <form action={subscriptionAction} className="rounded-2xl bg-white p-4">
+              <input type="hidden" name="id" value={sub.id} />
+              <input type="hidden" name="action" value="cancel-now" />
+              <p className="text-sm text-muted-foreground">This does not cancel anyone in Stripe.</p>
+              <Button className="mt-3 w-full" type="submit" variant="outline">Cancel Venmo subscription</Button>
+            </form>
+          )}
+        </div>
+      ) : (
       <div className="mt-6 space-y-4">
         <form action={subscriptionAction} className="rounded-2xl bg-white p-4">
           <input type="hidden" name="id" value={sub.id} />
           <input type="hidden" name="action" value="plan" />
           <Label htmlFor="planId">Change plan</Label>
           <p className="text-xs text-muted-foreground">Stripe prorates the difference and invoices it now. This person moves to the new plan&apos;s price and session count.</p>
-          <select id="planId" name="planId" className="mt-2 h-11 w-full rounded-md border border-border px-3" defaultValue={sub.planId}>
+          <select id="planId" name="planId" className="mt-2 h-11 w-full rounded-md border border-border px-3" defaultValue={sub.planId ?? ""}>
             {plans.map((plan) => (
               <option key={plan.id} value={plan.id}>{plan.name} · {formatMoney(plan.priceCents)} · {plan.sessionsPerMonth}/mo</option>
             ))}
@@ -90,6 +108,7 @@ export default async function SubscriptionDetail({
           ))}
         </div>
       </div>
+      )}
       {sub.waiverAcceptance ? (
         <details className="mt-6 rounded-xl bg-white p-4 text-sm">
           <summary className="cursor-pointer font-semibold">Waiver accepted {sub.waiverAcceptance.acceptedAt.toISOString()}</summary>

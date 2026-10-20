@@ -11,10 +11,12 @@ import { prisma } from "@/lib/prisma";
 import { type RepeatRule } from "@/lib/recurrence";
 import { cancelEvent, createEvent, deleteEvent, updateEvent, type EventInput, type EventScope } from "@/lib/series";
 import { getStripe, stripeConfigured } from "@/lib/stripe";
+import { deleteCoachLogin } from "@/lib/coach-admin";
 import {
   cancelAtPeriodEnd,
   cancelNow,
   changeSubscriptionPlan,
+  createVenmoSubscription,
   pauseSubscription,
   renewSubscription,
   resumeSubscription,
@@ -62,14 +64,17 @@ export async function createCoach(formData: FormData) {
     if (password.length < 8) throw new Error("Use a password of at least 8 characters.");
     const adminEmail = process.env.ADMIN_EMAIL ? normalizeEmail(process.env.ADMIN_EMAIL) : "";
     if (adminEmail && email === adminEmail) throw new Error("That email is the academy admin login.");
-    await prisma.staffUser.create({
-      data: {
-        name,
-        email,
-        passwordHash: await hashPassword(password),
-        coachName,
-      },
-    });
+    await prisma.$transaction([
+      prisma.retiredCoach.deleteMany({ where: { coachName } }),
+      prisma.staffUser.create({
+        data: {
+          name,
+          email,
+          passwordHash: await hashPassword(password),
+          coachName,
+        },
+      }),
+    ]);
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       fail("/admin/coaches", new Error("That email or schedule coach already has a login."));
@@ -253,7 +258,68 @@ export async function savePlan(formData: FormData) {
     fail("/admin/plans", error);
   }
   revalidatePath("/");
+  revalidatePath("/admin/plans");
   redirect("/admin/plans");
+}
+
+export async function deletePlan(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  try {
+    const plan = await prisma.plan.findUnique({ where: { id } });
+    if (!plan) throw new Error("That plan is already gone.");
+    const live = await prisma.subscription.count({
+      where: { planId: id, status: { not: "CANCELED" } },
+    });
+    if (live > 0) {
+      const noun = live === 1 ? "membership that is not canceled" : "memberships that are not canceled";
+      throw new Error(
+        `This plan still has ${live} ${noun}. Delete was refused. Those people were not canceled automatically.`,
+      );
+    }
+    await prisma.$transaction([
+      prisma.subscription.updateMany({ where: { planId: id }, data: { planName: plan.name } }),
+      prisma.plan.delete({ where: { id } }),
+    ]);
+  } catch (error) {
+    fail("/admin/plans", error);
+  }
+  revalidatePath("/");
+  revalidatePath("/admin/plans");
+  revalidatePath("/admin/subscriptions");
+  redirect("/admin/plans");
+}
+
+export async function createVenmoMembership(formData: FormData) {
+  await requireAdmin();
+  try {
+    await createVenmoSubscription({
+      parentName: String(formData.get("parentName") ?? ""),
+      email: String(formData.get("email") ?? ""),
+      phone: String(formData.get("phone") ?? ""),
+      playerName: String(formData.get("playerName") ?? ""),
+      planId: String(formData.get("planId") ?? ""),
+      priceCents: dollarsToCents(String(formData.get("price") ?? "")),
+      note: String(formData.get("note") ?? ""),
+    });
+  } catch (error) {
+    fail("/admin/subscriptions", error);
+  }
+  revalidatePath("/admin/subscriptions");
+  redirect("/admin/subscriptions");
+}
+
+export async function deleteCoach(formData: FormData) {
+  await requireAdmin();
+  try {
+    await deleteCoachLogin(String(formData.get("id") ?? ""));
+  } catch (error) {
+    fail("/admin/coaches", error);
+  }
+  revalidatePath("/");
+  revalidatePath("/admin/coaches");
+  revalidatePath("/admin/schedule");
+  redirect("/admin/coaches");
 }
 
 export async function savePromo(formData: FormData) {

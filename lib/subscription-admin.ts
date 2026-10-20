@@ -2,6 +2,11 @@ import { prisma } from "@/lib/prisma";
 import { ensurePlanStripePrice, mapSubscriptionStatus } from "@/lib/billing";
 import { getStripe } from "@/lib/stripe";
 import { etToUtc } from "@/lib/time";
+import { normalizeEmail } from "@/lib/utils";
+
+export function subscriptionPlanName(sub: { plan: { name: string } | null; planName: string }) {
+  return sub.plan?.name || sub.planName || "Deleted plan";
+}
 
 async function load(id: string) {
   const sub = await prisma.subscription.findUnique({
@@ -37,6 +42,7 @@ export async function changeSubscriptionPlan(id: string, planId: string) {
     where: { id: local.id },
     data: {
       planId: plan.id,
+      planName: plan.name,
       priceCents: plan.priceCents,
       sessionsIncluded: plan.sessionsPerMonth,
       status: mapSubscriptionStatus(updated),
@@ -47,6 +53,7 @@ export async function changeSubscriptionPlan(id: string, planId: string) {
 
 export async function setCustomPrice(id: string, priceCents: number) {
   const local = await load(id);
+  if (!local.plan) throw new Error("This subscription's plan was deleted.");
   const pricedPlan = await ensurePlanStripePrice(local.plan);
   if (!pricedPlan.stripeProductId) throw new Error("Stripe product is missing.");
   const stripe = getStripe();
@@ -104,6 +111,15 @@ export async function cancelAtPeriodEnd(id: string) {
 }
 
 export async function cancelNow(id: string) {
+  const sub = await prisma.subscription.findUnique({ where: { id } });
+  if (!sub) throw new Error("Subscription not found.");
+  if (sub.paymentMethod === "VENMO") {
+    await prisma.subscription.update({
+      where: { id: sub.id },
+      data: { status: "CANCELED", cancelAtPeriodEnd: false },
+    });
+    return;
+  }
   const local = await load(id);
   const updated = await getStripe().subscriptions.cancel(local.stripeSubscriptionId!);
   await prisma.subscription.update({
@@ -125,6 +141,7 @@ export async function renewSubscription(id: string) {
     });
     return;
   }
+  if (!local.plan || !local.planId) throw new Error("This subscription's plan was deleted.");
   const priced = await ensurePlanStripePrice(local.plan);
   if (!priced.stripePriceId) throw new Error("Stripe price is missing.");
   const created = await stripe.subscriptions.create({
@@ -148,6 +165,42 @@ export async function renewSubscription(id: string) {
       cancelAtPeriodEnd: false,
       sessionsUsed: 0,
       priceCents: local.plan.priceCents,
+      planName: local.plan.name,
+    },
+  });
+}
+
+export async function createVenmoSubscription(input: {
+  parentName: string;
+  email: string;
+  phone: string;
+  playerName: string;
+  planId: string;
+  priceCents: number;
+  note: string;
+}) {
+  const parentName = input.parentName.trim();
+  const playerName = input.playerName.trim();
+  const phone = input.phone.trim();
+  const email = normalizeEmail(input.email);
+  const note = input.note.trim();
+  if (!parentName || !playerName || !phone) throw new Error("Parent, player, and phone are required.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a real email address.");
+  const plan = await prisma.plan.findUnique({ where: { id: input.planId } });
+  if (!plan) throw new Error("Choose a plan.");
+  return prisma.subscription.create({
+    data: {
+      email,
+      parentName,
+      phone,
+      playerName,
+      planId: plan.id,
+      planName: plan.name,
+      priceCents: input.priceCents,
+      sessionsIncluded: plan.sessionsPerMonth,
+      paymentMethod: "VENMO",
+      note: note || null,
+      status: "ACTIVE",
     },
   });
 }

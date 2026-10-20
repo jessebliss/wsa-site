@@ -1,5 +1,6 @@
-import { savePlan } from "@/app/admin/(panel)/actions";
+import { deletePlan, savePlan } from "@/app/admin/(panel)/actions";
 import { AdminError } from "@/components/admin-error";
+import { ConfirmForm } from "@/components/confirm-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,6 +64,14 @@ export default async function PlansAdmin({
               </label>
               <Button type="submit" variant="outline">Save plan</Button>
             </form>
+            <ConfirmForm
+              action={deletePlan}
+              className="mt-3"
+              message="Delete this plan so it is no longer offered? Memberships that are not canceled will block this. People are not canceled automatically."
+            >
+              <input type="hidden" name="id" value={plan.id} />
+              <Button type="submit" variant="outline">Delete plan</Button>
+            </ConfirmForm>
           </li>
         ))}
       </ul>

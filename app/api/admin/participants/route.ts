@@ -77,7 +77,7 @@ export async function GET(request: Request) {
         row.email,
         row.phone,
         row.playerName,
-        row.plan.name,
+        row.plan?.name || row.planName || "Deleted plan",
         row.currentPeriodEnd ? formatEtLong(row.currentPeriodEnd) : "",
         formatMoney(row.priceCents),
         row.status,

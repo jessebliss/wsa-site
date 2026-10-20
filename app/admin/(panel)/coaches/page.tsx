@@ -1,6 +1,7 @@
-import { createCoach } from "@/app/admin/(panel)/actions";
+import { createCoach, deleteCoach } from "@/app/admin/(panel)/actions";
 import { AdminError } from "@/components/admin-error";
 import { CoachQrCard } from "@/components/coach-qr";
+import { ConfirmForm } from "@/components/confirm-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +19,7 @@ export default async function CoachesPage({
 }) {
   const params = await searchParams;
   const origin = await publicOrigin();
-  const [coaches, scheduleCoaches] = await Promise.all([
+  const [coaches, scheduleCoaches, retired] = await Promise.all([
     prisma.staffUser.findMany({ orderBy: { name: "asc" } }),
     prisma.trainingSession.findMany({
       where: { coach: { not: null } },
@@ -26,9 +27,14 @@ export default async function CoachesPage({
       select: { coach: true },
       orderBy: { coach: "asc" },
     }),
+    prisma.retiredCoach.findMany({ select: { coachName: true } }),
   ]);
   const names = scheduleCoaches.map((session) => session.coach).filter((name): name is string => Boolean(name));
-  const qrNames = [...QUARTERBACK_COACHES] as string[];
+  const retiredNames = new Set(retired.map((row) => row.coachName));
+  const loginNames = new Set(coaches.map((coach) => coach.coachName));
+  const qrNames = (QUARTERBACK_COACHES as readonly string[]).filter(
+    (name) => loginNames.has(name) || !retiredNames.has(name),
+  );
   for (const coach of coaches) {
     if (!qrNames.includes(coach.coachName)) qrNames.push(coach.coachName);
   }
@@ -82,6 +88,14 @@ export default async function CoachesPage({
             <p className="font-semibold">{coach.name}</p>
             <p className="text-sm text-muted-foreground">{coach.email}</p>
             <p className="text-sm">Schedule name: {coach.coachName}</p>
+            <ConfirmForm
+              action={deleteCoach}
+              className="mt-3"
+              message={`Delete ${coach.coachName}'s login, QR code, and saved availability? If an upcoming booking names only them, this is refused. Past attendance and payments stay.`}
+            >
+              <input type="hidden" name="id" value={coach.id} />
+              <Button type="submit" variant="outline">Delete coach</Button>
+            </ConfirmForm>
           </li>
         ))}
       </ul>

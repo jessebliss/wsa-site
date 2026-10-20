@@ -45,7 +45,7 @@ export default async function ParticipantsPage({
           <li key={row.id} className="rounded-xl bg-white p-4 text-sm">
             <p className="font-semibold">{row.playerName} · {row.parentName}</p>
             <p>{row.email} · {row.phone}</p>
-            <p>{row.plan.name} · {formatMoney(row.priceCents)} · {row.status}</p>
+            <p>{row.plan?.name || row.planName || "Deleted plan"} · {formatMoney(row.priceCents)} · {row.status}</p>
             <p className="text-muted-foreground">
               Waiver {row.waiverAcceptance ? `accepted ${row.waiverAcceptance.acceptedAt.toISOString()}` : "not stored"}
             </p>
