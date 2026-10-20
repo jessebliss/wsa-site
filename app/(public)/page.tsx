@@ -8,6 +8,7 @@ import { isPrivateQuarterback, matchCoachName } from "@/lib/private-quarterback"
 import { loadPrivateQuarterbackPrices, privateQuarterbackCoachNames } from "@/lib/private-quarterback-data";
 import { etDayKey, etToUtc, shiftMonth } from "@/lib/time";
 import { PublicSchedule } from "@/components/public-schedule";
+import { extendSeriesHorizon } from "@/lib/series";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Schedule" };
@@ -19,13 +20,14 @@ export default async function SchedulePage({
 }) {
   const query = await searchParams;
   const todayKey = etDayKey(new Date());
+  await extendSeriesHorizon(todayKey);
   const currentMonth = todayKey.slice(0, 7);
   const maxMonth = shiftMonth(currentMonth, 5);
   const rangeStart = etToUtc(todayKey, "00:00");
   const rangeEnd = etToUtc(`${shiftMonth(maxMonth, 1)}-01`, "00:00");
   const [sessions, plans, openings] = await Promise.all([
     prisma.trainingSession.findMany({
-      where: { status: "SCHEDULED", startsAt: { gte: rangeStart, lt: rangeEnd } },
+      where: { status: { in: ["SCHEDULED", "CANCELED"] }, startsAt: { gte: rangeStart, lt: rangeEnd } },
       orderBy: { startsAt: "asc" },
     }),
     prisma.plan.findMany({
@@ -75,6 +77,8 @@ export default async function SchedulePage({
           program: session.program,
           title: session.title,
           coach: session.coach,
+          coaches: session.coaches,
+          status: session.status,
           startsAt: session.startsAt.toISOString(),
           endsAt: session.endsAt.toISOString(),
           capacity: session.capacity,

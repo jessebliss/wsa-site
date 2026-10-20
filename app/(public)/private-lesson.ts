@@ -44,10 +44,10 @@ async function ensurePrivateQuarterbackHour(coach: string, dayKey: string, hour:
   const id = await prisma.$transaction(async (tx) => {
     const overlap = await tx.trainingSession.findMany({
       where: {
-        coach,
         status: "SCHEDULED",
         startsAt: { lt: endsAt },
         endsAt: { gt: startsAt },
+        OR: [{ coach }, { coaches: { has: coach } }],
       },
     });
     const exact = overlap.find(

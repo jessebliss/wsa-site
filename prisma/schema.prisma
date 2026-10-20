@@ -17,6 +17,23 @@ enum SessionStatus {
   CANCELED
 }
 
+enum RepeatKind {
+  NONE
+  DAILY
+  EVERY_N_DAYS
+  WEEKLY
+  EVERY_N_WEEKS
+  MONTHLY_DATE
+  MONTHLY_WEEKDAY
+  YEARLY
+}
+
+enum SeriesEnd {
+  NEVER
+  ON
+  AFTER
+}
+
 enum RegistrationKind {
   ONE_TIME
   PLAN_CREDIT
@@ -57,26 +74,63 @@ model Plan {
   @@map("plans")
 }
 
-model TrainingSession {
-  id            String         @id @default(cuid())
-  seedKey       String?        @unique
-  kind          SessionKind
-  program       String
-  title         String
-  coach         String?
-  description   String?
-  location      String
-  startsAt      DateTime
-  endsAt        DateTime
-  capacity      Int
-  priceCents    Int
-  status        SessionStatus  @default(SCHEDULED)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  registrations Registration[]
+model EventSeries {
+  id              String            @id @default(cuid())
+  repeatKind      RepeatKind
+  interval        Int               @default(1)
+  weekdays        Int[]             @default([])
+  monthOrdinal    Int?
+  monthWeekday    Int?
+  ends            SeriesEnd         @default(NEVER)
+  untilDay        String?
+  occurrenceCount Int?
+  anchorDay       String
+  skippedDays     String[]          @default([])
+  kind            SessionKind
+  program         String
+  title           String
+  coach           String?
+  coaches         String[]          @default([])
+  description     String?
+  location        String
+  startTime       String
+  endTime         String
+  capacity        Int
+  priceCents      Int
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  sessions        TrainingSession[]
 
+  @@map("event_series")
+}
+
+model TrainingSession {
+  id              String         @id @default(cuid())
+  seedKey         String?        @unique
+  kind            SessionKind
+  program         String
+  title           String
+  coach           String?
+  coaches         String[]       @default([])
+  description     String?
+  location        String
+  startsAt        DateTime
+  endsAt          DateTime
+  capacity        Int
+  priceCents      Int
+  status          SessionStatus  @default(SCHEDULED)
+  seriesId        String?
+  series          EventSeries?   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  seriesException Boolean        @default(false)
+  occurrenceDay   String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  registrations   Registration[]
+
+  @@unique([seriesId, occurrenceDay])
   @@index([startsAt])
   @@index([status, startsAt])
+  @@index([seriesId])
   @@map("sessions")
 }
 
@@ -138,8 +192,9 @@ model Subscription {
 
 model Registration {
   id                      String           @id @default(cuid())
-  sessionId               String
-  session                 TrainingSession  @relation(fields: [sessionId], references: [id])
+  sessionId               String?
+  session                 TrainingSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  product                 String?
   email                   String
   parentName              String
   phone                   String

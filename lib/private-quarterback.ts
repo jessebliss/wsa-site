@@ -49,11 +49,19 @@ export type PrivateHourSession = {
   kind: string;
   program: string;
   coach: string | null;
+  coaches?: string[];
+  status?: string;
   startsAt: string;
   endsAt: string;
   spotsLeft: number;
   priceCents: number;
 };
+
+function sessionInvolvesCoach(session: PrivateHourSession, coach: string) {
+  if (session.status === "CANCELED") return false;
+  if (session.coach === coach) return true;
+  return session.coaches?.includes(coach) ?? false;
+}
 
 export type OpenPrivateHour = {
   hour: number;
@@ -99,7 +107,7 @@ export function openPrivateHours(input: {
     if (!Number.isInteger(hour)) continue;
     const { startsAt, endsAt } = privateHourBounds(input.dayKey, hour);
     if (startsAt.getTime() <= input.now.getTime()) continue;
-    const mine = input.sessions.filter((session) => session.coach === input.coach);
+    const mine = input.sessions.filter((session) => sessionInvolvesCoach(session, input.coach));
     const exact = mine.find((session) => isExactOpenPrivate(session, startsAt, endsAt));
     const blocked = mine.some((session) => {
       if (exact && session.id === exact.id) return false;

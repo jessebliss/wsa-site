@@ -98,6 +98,28 @@ export function addMinutes(date: Date, minutes: number) {
   return new Date(date.getTime() + minutes * 60 * 1000);
 }
 
+export function addDays(dayKey: string, days: number) {
+  const [year, month, day] = dayKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
+export function addMonthsToDay(dayKey: string, delta: number) {
+  const month = shiftMonth(dayKey.slice(0, 7), delta);
+  const wanted = Number(dayKey.slice(8, 10));
+  const [year, monthNumber] = month.split("-").map(Number);
+  const last = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+  return `${month}-${String(Math.min(wanted, last)).padStart(2, "0")}`;
+}
+
+export function daysBetween(start: string, end: string) {
+  const [sy, sm, sd] = start.split("-").map(Number);
+  const [ey, em, ed] = end.split("-").map(Number);
+  const from = Date.UTC(sy, sm - 1, sd);
+  const to = Date.UTC(ey, em - 1, ed);
+  return Math.round((to - from) / (24 * 60 * 60 * 1000));
+}
+
 export function shiftMonth(monthKey: string, delta: number) {
   const [year, month] = monthKey.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1 + delta, 1));

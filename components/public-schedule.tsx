@@ -17,7 +17,7 @@ import {
   type OpenPrivateHour,
   type PrivateHourSession,
 } from "@/lib/private-quarterback";
-import { offeringKey, offeringLabel, offeringRank, openSessions, sessionsOnDay } from "@/lib/schedule-filter";
+import { offeringKey, offeringLabel, offeringRank, openSessions, sessionCoachNames, sessionsOnDay } from "@/lib/schedule-filter";
 import { dayKeysForMonth, etDayKey, etToUtc, formatEt, formatEtDate, formatEtTime } from "@/lib/time";
 
 export type ScheduleSession = {
@@ -26,6 +26,8 @@ export type ScheduleSession = {
   program: string;
   title: string;
   coach: string | null;
+  coaches: string[];
+  status: "SCHEDULED" | "CANCELED";
   startsAt: string;
   endsAt: string;
   spotsLeft: number;
@@ -80,6 +82,21 @@ function HourButton({ slot, priceCents }: { slot: OpenPrivateHour; priceCents: n
         {pending ? "Opening checkout" : `${formatEtTime(start)}–${formatEtTime(end)} ET`}
       </p>
     </button>
+  );
+}
+
+function CanceledCard({ session }: { session: ScheduleSession }) {
+  const names = sessionCoachNames(session);
+  return (
+    <div className="rounded-2xl border border-border bg-white p-4" data-canceled={session.id}>
+      <Badge>Canceled</Badge>
+      <h4 className="mt-2 font-display text-2xl uppercase leading-none line-through">{session.title}</h4>
+      <p className="mt-3 text-sm">
+        {formatEtTime(new Date(session.startsAt))}–{formatEtTime(new Date(session.endsAt))} ET
+        {names.length > 0 ? ` · ${names.join(", ")}` : ""}
+      </p>
+      <p className="mt-1 text-sm text-muted-foreground">Canceled. This time can hold another event.</p>
+    </div>
   );
 }
 
@@ -138,10 +155,12 @@ export function PublicSchedule({
     const order = Object.keys(portraits);
     const prices = new Map<string, number[]>();
     for (const session of bookable) {
-      if (offeringKey(session) !== offeringId || !session.coach) continue;
-      const list = prices.get(session.coach) ?? [];
-      list.push(session.priceCents);
-      prices.set(session.coach, list);
+      if (offeringKey(session) !== offeringId) continue;
+      for (const name of sessionCoachNames(session)) {
+        const list = prices.get(name) ?? [];
+        list.push(session.priceCents);
+        prices.set(name, list);
+      }
     }
     return Array.from(prices.entries())
       .map(([name, cents]) => ({ name, price: priceLabel(cents), photo: portraits[name] ?? "" }))
@@ -154,9 +173,11 @@ export function PublicSchedule({
 
   const offering = offerings.find((item) => item.id === offeringId);
   const privateBooking = offeringId === PRIVATE_QUARTERBACK_KEY;
-  const introBooking = offeringId === INTRO_KEY;
   const usesAvailability = privateBooking && coachHasLogin(openings, coach);
-  const chosen = bookable.filter((session) => offeringKey(session) === offeringId && session.coach === coach);
+  const onThisCoach = (session: ScheduleSession) =>
+    offeringKey(session) === offeringId && sessionCoachNames(session).includes(coach);
+  const chosen = bookable.filter(onThisCoach);
+  const canceledChosen = sessions.filter((session) => session.status === "CANCELED" && onThisCoach(session));
   const privatePrice = privateCoaches.find((person) => person.name === coach)?.priceCents ?? 0;
   const monthDays = useMemo(() => dayKeysForMonth(month), [month]);
   const counts = useMemo(() => {
@@ -170,13 +191,14 @@ export function PublicSchedule({
       }
       return tally;
     }
-    for (const session of chosen) {
+    for (const session of [...chosen, ...canceledChosen]) {
       const key = etDayKey(new Date(session.startsAt));
       if (!monthDays.includes(key) || key < todayKey) continue;
       tally[key] = (tally[key] ?? 0) + 1;
     }
     return tally;
-  }, [usesAvailability, coach, openings, sessions, now, chosen, monthDays, todayKey]);
+  }, [usesAvailability, coach, openings, sessions, now, chosen, canceledChosen, monthDays, todayKey]);
+  const canceledToday = sessionsOnDay(canceledChosen, day);
   const daySessions = sessionsOnDay(chosen, day).sort(
     (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
   );
@@ -222,7 +244,7 @@ export function PublicSchedule({
   const coachPhoto = portraits[coach] ?? "";
   const groupSchedule = useMemo(() => {
     const rows = sessions
-      .filter((session) => session.kind === "GROUP" && session.program !== INTRO_LABEL)
+      .filter((session) => session.kind === "GROUP" && session.program !== INTRO_LABEL && sessionCoachNames(session).length > 0)
       .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
     const byDay = new Map<string, ScheduleSession[]>();
     for (const session of rows) {
@@ -276,8 +298,9 @@ export function PublicSchedule({
                           <p className="font-semibold">{session.title}</p>
                           <p>
                             {formatEtTime(new Date(session.startsAt))}–{formatEtTime(new Date(session.endsAt))} ET
-                            {session.coach ? ` · ${session.coach}` : ""}
+                            {` · ${sessionCoachNames(session).join(", ")}`}
                           </p>
+                          {session.status === "CANCELED" ? <p className="font-semibold">Canceled</p> : null}
                           <p className="text-muted-foreground">{session.location}</p>
                         </li>
                       ))}
@@ -306,8 +329,6 @@ export function PublicSchedule({
         ) : null}
         <h2 className="mt-4 font-display text-4xl uppercase leading-none">{question}</h2>
         {trail ? <p className="mt-2 text-sm text-muted-foreground">{trail}</p> : null}
-        {introBooking ? <p className="mt-2 max-w-2xl text-sm">{INTRO_NOTE} The price is $125.</p> : null}
-
         {step === 1 ? (
           offerings.length === 0 ? (
             <p className="mt-4 rounded-2xl bg-white p-5 text-sm text-muted-foreground">
@@ -315,37 +336,44 @@ export function PublicSchedule({
             </p>
           ) : (
             <div className="mt-4 grid gap-3">
-              {offerings.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  data-offering={item.label}
-                  onClick={() => pickOffering(item.id)}
-                  className="min-h-14 rounded-2xl bg-white px-4 py-4 text-left"
-                >
-                  <span className="block font-display text-2xl uppercase leading-none">{item.label}</span>
-                  {item.id === INTRO_KEY ? (
-                    <span className="mt-2 block text-sm normal-case leading-snug text-muted-foreground">{INTRO_NOTE} $125.</span>
-                  ) : null}
-                </button>
-              ))}
+              {offerings.map((item) =>
+                item.id === INTRO_KEY ? (
+                  <Link
+                    key={item.id}
+                    href="/book/intro"
+                    data-offering={item.label}
+                    className="block min-h-14 rounded-2xl bg-white px-4 py-4 text-left"
+                  >
+                    <span className="block font-display text-2xl uppercase leading-none">{item.label}</span>
+                    <span className="mt-2 block text-sm leading-snug text-muted-foreground">{INTRO_NOTE} {formatMoney(INTRO_PRICE_CENTS)}.</span>
+                  </Link>
+                ) : (
+                  <button
+                    key={item.id}
+                    type="button"
+                    data-offering={item.label}
+                    onClick={() => pickOffering(item.id)}
+                    className="min-h-14 rounded-2xl bg-white px-4 py-4 text-left"
+                  >
+                    <span className="block font-display text-2xl uppercase leading-none">{item.label}</span>
+                  </button>
+                ),
+              )}
             </div>
           )
         ) : null}
 
-        {step === 2 && introBooking && coachesForOffering.length === 0 ? (
+        {step === 2 && coachesForOffering.length === 0 && !privateBooking ? (
           <p className="mt-4 rounded-2xl bg-white p-5 text-sm text-muted-foreground">None are on the calendar yet.</p>
         ) : null}
 
-        {step === 2 && !(introBooking && coachesForOffering.length === 0) ? (
+        {step === 2 && (privateBooking || coachesForOffering.length > 0) ? (
           <div className="mt-4 grid gap-3">
             {(privateBooking ? privateCoaches.map((person) => ({
               name: person.name,
               price: formatMoney(person.priceCents),
               photo: portraits[person.name] ?? "",
-            })) : coachesForOffering.map((person) => (
-              introBooking ? { ...person, price: formatMoney(INTRO_PRICE_CENTS) } : person
-            ))).map((person) => (
+            })) : coachesForOffering).map((person) => (
               <button
                 key={person.name}
                 type="button"
@@ -413,6 +441,13 @@ export function PublicSchedule({
                     );
                   })}
                 </div>
+                {canceledToday.length > 0 ? (
+                  <div className="mt-3 space-y-3">
+                    {canceledToday.map((session) => (
+                      <CanceledCard key={session.id} session={session} />
+                    ))}
+                  </div>
+                ) : null}
               </>
             ) : null}
             {day && !usesAvailability ? (
@@ -432,7 +467,7 @@ export function PublicSchedule({
                           <Badge>{session.kind === "GROUP" ? "Group" : session.kind === "CAMP" ? "Camp" : "Private"}</Badge>
                           <h4 className="mt-2 font-display text-2xl uppercase leading-none">{session.title}</h4>
                         </div>
-                        <p className="text-right font-display text-2xl">{formatMoney(introBooking ? INTRO_PRICE_CENTS : session.priceCents)}</p>
+                        <p className="text-right font-display text-2xl">{formatMoney(session.priceCents)}</p>
                       </div>
                       <div className="mt-3 flex items-end justify-between gap-3 text-sm">
                         <p>
@@ -442,7 +477,13 @@ export function PublicSchedule({
                           {session.spotsLeft} spot{session.spotsLeft === 1 ? "" : "s"} left
                         </p>
                       </div>
+                      {session.kind === "GROUP" ? (
+                        <p className="mt-2 text-sm text-muted-foreground">{sessionCoachNames(session).join(", ")}</p>
+                      ) : null}
                     </Link>
+                  ))}
+                  {canceledToday.map((session) => (
+                    <CanceledCard key={session.id} session={session} />
                   ))}
                 </div>
               </>

@@ -60,8 +60,12 @@ export default async function ParticipantsPage({
             <p className="font-semibold">{row.playerName} · {row.parentName}</p>
             <p>{row.email} · {row.phone}</p>
             <p>
-              <Link className="font-semibold" href={`/admin/schedule/${row.sessionId}/roster`}>{row.session.title}</Link>
-              {" · "}{formatEtDate(row.session.startsAt)} · {formatMoney(row.amountCents)} · {row.paymentStatus}
+              {row.session && row.sessionId ? (
+                <Link className="font-semibold" href={`/admin/schedule/${row.sessionId}/roster`}>{row.session.title}</Link>
+              ) : (
+                <span className="font-semibold">QB Introduction Session</span>
+              )}
+              {" · "}{row.session ? formatEtDate(row.session.startsAt) : "Not scheduled"} · {formatMoney(row.amountCents)} · {row.paymentStatus}
             </p>
             <p className="text-muted-foreground">Waiver accepted {row.waiverAcceptance.acceptedAt.toISOString()}</p>
           </li>

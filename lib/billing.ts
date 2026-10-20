@@ -243,7 +243,8 @@ export async function markSessionPaid(session: Stripe.Checkout.Session) {
       stripeCheckoutSessionId: session.id,
     },
   });
-  const when = formatEtLong(registration.session.startsAt);
+  const title = registration.session?.title ?? "QB Introduction Session";
+  const when = registration.session ? `${formatEtLong(registration.session.startsAt)} ET` : "Not scheduled";
   await sendReceipt(
     registration.email,
     "Walker Sports Academy receipt",
@@ -252,8 +253,8 @@ export async function markSessionPaid(session: Stripe.Checkout.Session) {
       "",
       `Player: ${registration.playerName}`,
       `Parent: ${registration.parentName}`,
-      `Session: ${registration.session.title}`,
-      `When: ${when} ET`,
+      `Session: ${title}`,
+      `When: ${when}`,
       `Session: ${formatMoney((session.amount_total ?? registration.amountCents) - registration.registrationCents - registration.taxCents)}`,
       registration.registrationCents > 0 ? `Registration: ${formatMoney(registration.registrationCents)}` : "",
       registration.taxCents > 0 ? `Tax: ${formatMoney(registration.taxCents)}` : "",

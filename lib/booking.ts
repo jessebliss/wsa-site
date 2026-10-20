@@ -199,6 +199,47 @@ export async function bookWithPlanCredit(sessionId: string, person: PersonInput)
   });
 }
 
+export async function holdIntro(
+  person: PersonInput,
+  promo: PromoCode | null,
+  charge: { totalCents: number; registrationCents: number; taxCents: number },
+) {
+  const email = normalizeEmail(person.email);
+  const now = new Date();
+  const waiver = await prisma.waiver.findFirst({
+    where: { isCurrent: true },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!waiver) throw new BookingError("The waiver is not set up yet.");
+  const acceptance = await prisma.waiverAcceptance.create({
+    data: {
+      fullName: person.parentName,
+      email,
+      waiverText: waiver.body,
+      waiverId: waiver.id,
+    },
+  });
+  const registration = await prisma.registration.create({
+    data: {
+      sessionId: null,
+      product: "intro",
+      email,
+      parentName: person.parentName,
+      phone: person.phone,
+      playerName: person.playerName,
+      kind: "ONE_TIME",
+      paymentStatus: "PENDING",
+      amountCents: charge.totalCents,
+      registrationCents: charge.registrationCents,
+      taxCents: charge.taxCents,
+      promoCodeId: promo?.id,
+      waiverAcceptanceId: acceptance.id,
+      holdExpiresAt: new Date(now.getTime() + HOLD_MS),
+    },
+  });
+  return { registration };
+}
+
 export async function holdOneTime(
   sessionId: string,
   person: PersonInput,

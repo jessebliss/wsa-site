@@ -6,9 +6,10 @@ import { auth, signOut } from "@/lib/auth";
 import { refundRegistration } from "@/lib/billing";
 import { ensurePlanStripePrice } from "@/lib/billing";
 import { dollarsToCents, optionalDollarsToCents } from "@/lib/money";
-import { INTRO_PRICE_CENTS, isIntro } from "@/lib/intro";
 import { percentToBps } from "@/lib/fees";
 import { prisma } from "@/lib/prisma";
+import { type RepeatRule } from "@/lib/recurrence";
+import { cancelEvent, createEvent, deleteEvent, updateEvent, type EventInput, type EventScope } from "@/lib/series";
 import { getStripe, stripeConfigured } from "@/lib/stripe";
 import {
   cancelAtPeriodEnd,
@@ -22,7 +23,7 @@ import {
 } from "@/lib/subscription-admin";
 import { hourStartsForDay } from "@/lib/availability";
 import { hashPassword } from "@/lib/password";
-import { etDayKey, etToUtc, shiftMonth } from "@/lib/time";
+import { etDayKey, shiftMonth } from "@/lib/time";
 import { normalizeEmail } from "@/lib/utils";
 import { Prisma } from "@prisma/client";
 
@@ -122,37 +123,81 @@ export async function saveCoachDay(formData: FormData) {
   redirect(`${back}&saved=1`);
 }
 
+function readScope(formData: FormData): EventScope {
+  const scope = String(formData.get("scope") ?? "this");
+  if (scope === "following" || scope === "all" || scope === "this") return scope;
+  throw new Error("Choose this occurrence, this and following, or the whole series.");
+}
+
+function readRule(formData: FormData): RepeatRule {
+  const kind = String(formData.get("repeat") ?? "none") as RepeatRule["kind"];
+  const ends = String(formData.get("ends") ?? "never") as RepeatRule["ends"];
+  const weekdays = formData
+    .getAll("weekdays")
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value) && value >= 0 && value <= 6);
+  return {
+    kind,
+    interval: Number(formData.get("interval") ?? 1),
+    weekdays,
+    ordinal: Number(formData.get("ordinal") ?? 1),
+    weekday: Number(formData.get("monthWeekday") ?? 0),
+    ends: ends === "on" || ends === "after" ? ends : "never",
+    until: String(formData.get("until") ?? ""),
+    count: Number(formData.get("count") ?? 1),
+  };
+}
+
+function readEvent(formData: FormData): EventInput {
+  const kind = String(formData.get("kind") ?? "GROUP") as EventInput["kind"];
+  const coaches = formData
+    .getAll("coaches")
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+  return {
+    kind,
+    program: String(formData.get("program") ?? "").trim(),
+    title: String(formData.get("title") ?? "").trim(),
+    coach: kind === "GROUP" ? null : String(formData.get("coach") ?? "").trim() || null,
+    coaches: kind === "GROUP" ? Array.from(new Set(coaches)) : [],
+    description: String(formData.get("description") ?? "").trim() || null,
+    location: String(formData.get("location") ?? "").trim(),
+    date: String(formData.get("date") ?? ""),
+    start: String(formData.get("start") ?? ""),
+    end: String(formData.get("end") ?? ""),
+    capacity: Number(formData.get("capacity")),
+    priceCents: dollarsToCents(String(formData.get("price") ?? "")),
+    rule: readRule(formData),
+  };
+}
+
 export async function saveSession(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") ?? "");
   const back = id ? `/admin/schedule/${id}` : "/admin/schedule";
   try {
-    const date = String(formData.get("date") ?? "");
-    const start = String(formData.get("start") ?? "");
-    const end = String(formData.get("end") ?? "");
-    const startsAt = etToUtc(date, start);
-    const endsAt = etToUtc(date, end);
-    if (!(startsAt.getTime() < endsAt.getTime())) throw new Error("End time has to be after the start.");
-    const data = {
-      kind: String(formData.get("kind")) as "GROUP" | "CAMP" | "PRIVATE",
-      program: String(formData.get("program") ?? "").trim(),
-      title: String(formData.get("title") ?? "").trim(),
-      coach: String(formData.get("coach") ?? "").trim() || null,
-      description: String(formData.get("description") ?? "").trim() || null,
-      location: String(formData.get("location") ?? "").trim(),
-      startsAt,
-      endsAt,
-      capacity: Number(formData.get("capacity")),
-      priceCents: dollarsToCents(String(formData.get("price") ?? "")),
-      status: String(formData.get("status") ?? "SCHEDULED") as "SCHEDULED" | "CANCELED",
-    };
-    if (!data.program || !data.title || !data.location) throw new Error("Program, title, and location are required.");
-    if (!Number.isInteger(data.capacity) || data.capacity < 1) throw new Error("Capacity has to be at least 1.");
-    if (isIntro(data)) data.priceCents = INTRO_PRICE_CENTS;
-    if (id) {
-      await prisma.trainingSession.update({ where: { id }, data });
+    const intent = String(formData.get("intent") ?? "save");
+    const scope = readScope(formData);
+    if (id && intent !== "save") {
+      const session = await prisma.trainingSession.findUnique({ where: { id }, select: { seriesId: true } });
+      if (session?.seriesId && !formData.get("scope")) {
+        throw new Error("Choose this occurrence, this and following, or the whole series.");
+      }
+    }
+    if (intent === "cancel") {
+      if (!id) throw new Error("Choose an event to cancel.");
+      await cancelEvent(id, scope);
+    } else if (intent === "delete") {
+      if (!id) throw new Error("Choose an event to delete.");
+      await deleteEvent(id, scope);
+    } else if (id) {
+      const session = await prisma.trainingSession.findUnique({ where: { id }, select: { seriesId: true } });
+      if (session?.seriesId && !["this", "following", "all"].includes(String(formData.get("scope") ?? ""))) {
+        throw new Error("Choose this occurrence, this and following, or the whole series.");
+      }
+      await updateEvent(id, scope, readEvent(formData));
     } else {
-      await prisma.trainingSession.create({ data });
+      await createEvent(readEvent(formData));
     }
   } catch (error) {
     fail(back, error);

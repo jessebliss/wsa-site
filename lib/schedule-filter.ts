@@ -44,13 +44,26 @@ export function offeringRank(session: OfferingSession) {
   return 30;
 }
 
-export function openSessions<T extends OfferingSession & { coach: string | null; startsAt: string; endsAt: string; spotsLeft: number }>(
-  sessions: T[],
-  openings: OpeningsByCoach,
-) {
+export function sessionCoachNames(session: { kind: string; coach: string | null; coaches?: string[] | null }) {
+  if (session.kind === "GROUP") return (session.coaches ?? []).filter(Boolean);
+  return session.coach ? [session.coach] : [];
+}
+
+export function openSessions<
+  T extends OfferingSession & {
+    coach: string | null;
+    coaches?: string[] | null;
+    startsAt: string;
+    endsAt: string;
+    spotsLeft: number;
+    status?: string;
+  },
+>(sessions: T[], openings: OpeningsByCoach) {
   return sessions.filter((session) => {
+    if (session.status === "CANCELED") return false;
+    if (isIntro(session)) return false;
     if (session.spotsLeft <= 0) return false;
-    if (isIntro(session)) return true;
+    if (session.kind === "GROUP") return sessionCoachNames(session).length > 0;
     return sessionWithinOpening(session, openings);
   });
 }

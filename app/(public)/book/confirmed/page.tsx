@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { INTRO_LABEL, INTRO_NOTE } from "@/lib/intro";
 import { prisma } from "@/lib/prisma";
 import { formatEtLong } from "@/lib/time";
 
@@ -20,9 +21,15 @@ export default async function ConfirmedPage({
       <h1 className="font-display text-5xl uppercase">You&apos;re booked</h1>
       {registration ? (
         <>
-          <p className="mt-3 text-lg">{registration.playerName} is in for {registration.session.title}.</p>
-          <p className="mt-1 text-sm">{formatEtLong(registration.session.startsAt)} ET</p>
-          <p className="mt-1 text-sm text-muted-foreground">{registration.session.location}</p>
+          <p className="mt-3 text-lg">{registration.playerName} is in for {registration.session?.title ?? INTRO_LABEL}.</p>
+          {registration.session ? (
+            <>
+              <p className="mt-1 text-sm">{formatEtLong(registration.session.startsAt)} ET</p>
+              <p className="mt-1 text-sm text-muted-foreground">{registration.session.location}</p>
+            </>
+          ) : (
+            <p className="mt-1 text-sm">{INTRO_NOTE} This session is not on the calendar.</p>
+          )}
           {registration.kind === "PLAN_CREDIT" ? (
             <p className="mt-4 text-sm">This session is covered by the monthly plan on {registration.email}. One session was used.</p>
           ) : (
