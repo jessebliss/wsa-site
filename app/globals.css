@@ -10,6 +10,8 @@
   --muted-foreground: #5c564c;
   --border: #e4dccf;
   --ink: #111111;
+  --group: #c4121a;
+  --private: #1d4e89;
 }
 
 @theme inline {
@@ -22,6 +24,8 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
   --color-ink: var(--ink);
+  --color-group: var(--group);
+  --color-private: var(--private);
   --font-sans: var(--font-body);
   --font-display: var(--font-display);
 }

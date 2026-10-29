@@ -281,6 +281,15 @@ model StripeEvent {
   @@map("stripe_events")
 }
 
+model CoachPrice {
+  coachName               String   @id
+  privateQuarterbackCents Int?
+  speedCents              Int?
+  updatedAt               DateTime @updatedAt
+
+  @@map("coach_prices")
+}
+
 model RetiredCoach {
   id        String   @id @default(cuid())
   coachName String   @unique

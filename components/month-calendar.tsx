@@ -1,9 +1,29 @@
 "use client";
 
+import Link from "next/link";
 import { weekdayIndexForDayKey } from "@/lib/availability";
 import { dayKeysForMonth, etToUtc, formatEt, formatMonthLabel } from "@/lib/time";
 
 const weekdayLabels = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+export type CalendarBlock = {
+  id: string;
+  dayKey: string;
+  title: string;
+  time: string;
+  tone: "group" | "private";
+  canceled: boolean;
+  href?: string;
+};
+
+function blockClass(tone: CalendarBlock["tone"], canceled: boolean) {
+  if (canceled) {
+    return tone === "private"
+      ? "bg-private/20 text-private line-through"
+      : "bg-group/20 text-group line-through";
+  }
+  return tone === "private" ? "bg-private text-white" : "bg-group text-white";
+}
 
 export function MonthCalendar({
   month,
@@ -14,6 +34,8 @@ export function MonthCalendar({
   marked,
   counts,
   onlyOpen = false,
+  allowPast = false,
+  events,
   onSelect,
   onMonth,
 }: {
@@ -27,12 +49,23 @@ export function MonthCalendar({
   counts?: Record<string, number>;
   /** Days with no opening stay quiet and cannot be tapped. */
   onlyOpen?: boolean;
+  /** Admin can open events that already happened. */
+  allowPast?: boolean;
+  /** Color blocks drawn on the day. Omit this on the compact day picker. */
+  events?: CalendarBlock[];
   onSelect: (dayKey: string) => void;
   onMonth: (monthKey: string) => void;
 }) {
   const keys = dayKeysForMonth(month);
   const leading = weekdayIndexForDayKey(keys[0] ?? `${month}-01`);
   const marks = new Set(marked);
+  const eventsByDay = new Map<string, CalendarBlock[]>();
+  for (const event of events ?? []) {
+    const list = eventsByDay.get(event.dayKey) ?? [];
+    list.push(event);
+    eventsByDay.set(event.dayKey, list);
+  }
+  const showingBlocks = events != null;
   const atStart = month <= minMonth;
   const atEnd = month >= maxMonth;
 
@@ -77,11 +110,12 @@ export function MonthCalendar({
           <span key={`blank-${index}`} />
         ))}
         {keys.map((key) => {
-          const past = key < todayKey;
+          const past = key < todayKey && !allowPast;
           const isSelected = key === selected;
           const count = counts?.[key] ?? 0;
           const open = counts ? count > 0 : marks.has(key);
-          const disabled = past || (onlyOpen && !open);
+          const dayEvents = eventsByDay.get(key) ?? [];
+          const disabled = past || (onlyOpen && !open && dayEvents.length === 0);
           const label = formatEt(etToUtc(key, "12:00"), { weekday: "long", month: "long", day: "numeric" });
           const status = counts
             ? open
@@ -90,6 +124,65 @@ export function MonthCalendar({
             : open
               ? ", open times"
               : "";
+          if (showingBlocks) {
+            return (
+              <div
+                key={key}
+                data-date={key}
+                data-count={counts ? String(count) : undefined}
+                className={`flex min-h-20 flex-col rounded-lg p-0.5 sm:min-h-24 ${
+                  isSelected ? "bg-primary text-white" : past ? "text-muted-foreground/50" : open && onlyOpen ? "bg-primary/10" : "bg-muted/40"
+                }`}
+              >
+                <button
+                  type="button"
+                  disabled={past || (onlyOpen && !open)}
+                  aria-pressed={isSelected}
+                  aria-label={`${label}${status}`}
+                  onClick={() => onSelect(key)}
+                  className="px-0.5 text-left text-[11px] font-semibold disabled:cursor-default"
+                >
+                  {Number(key.slice(-2))}
+                </button>
+                <div className="mt-0.5 flex flex-col gap-0.5">
+                  {dayEvents.map((event) => {
+                    const className = `block rounded-sm px-1 py-0.5 text-left text-[10px] font-semibold leading-tight ${blockClass(event.tone, event.canceled)}`;
+                    const text = (
+                      <>
+                        <span className="block truncate">{event.time}</span>
+                        <span className="block truncate">{event.title}</span>
+                      </>
+                    );
+                    if (event.href) {
+                      return (
+                        <Link
+                          key={event.id}
+                          href={event.href}
+                          data-event={event.id}
+                          data-tone={event.tone}
+                          data-canceled={event.canceled ? "yes" : "no"}
+                          className={className}
+                        >
+                          {text}
+                        </Link>
+                      );
+                    }
+                    return (
+                      <span
+                        key={event.id}
+                        data-event={event.id}
+                        data-tone={event.tone}
+                        data-canceled={event.canceled ? "yes" : "no"}
+                        className={className}
+                      >
+                        {text}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          }
           return (
             <button
               key={key}

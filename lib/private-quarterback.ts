@@ -2,6 +2,7 @@ import type { OpeningsByCoach } from "@/lib/availability";
 import { etToUtc } from "@/lib/time";
 
 export const QUARTERBACK_PROGRAM = "Quarterback Training";
+export const SPEED_PROGRAM = "Speed & Agility";
 export const PRIVATE_QUARTERBACK_LABEL = "Quarterback Training";
 export const GROUP_QUARTERBACK_LABEL = "Monthly group quarterback";
 export const PRIVATE_QUARTERBACK_KEY = "private:quarterback";

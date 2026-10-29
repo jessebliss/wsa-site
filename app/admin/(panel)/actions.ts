@@ -85,6 +85,34 @@ export async function createCoach(formData: FormData) {
   redirect("/admin/coaches");
 }
 
+export async function saveCoachPrices(formData: FormData) {
+  await requireAdmin();
+  const coachName = String(formData.get("coachName") ?? "").trim();
+  try {
+    if (!coachName) throw new Error("Choose a coach.");
+    const data: { privateQuarterbackCents?: number; speedCents?: number } = {};
+    if (formData.has("privateQuarterback")) {
+      data.privateQuarterbackCents = dollarsToCents(String(formData.get("privateQuarterback") ?? ""));
+    }
+    if (formData.has("speed")) {
+      data.speedCents = dollarsToCents(String(formData.get("speed") ?? ""));
+    }
+    if (data.privateQuarterbackCents == null && data.speedCents == null) {
+      throw new Error("Nothing to save for this coach.");
+    }
+    await prisma.coachPrice.upsert({
+      where: { coachName },
+      create: { coachName, ...data },
+      update: data,
+    });
+  } catch (error) {
+    fail("/admin/coaches", error);
+  }
+  revalidatePath("/");
+  revalidatePath("/admin/coaches");
+  redirect("/admin/coaches?saved=1");
+}
+
 export async function saveCoachDay(formData: FormData) {
   const staffUserId = await requireCoach();
   const dayKey = String(formData.get("dayKey") ?? "");

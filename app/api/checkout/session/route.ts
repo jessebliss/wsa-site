@@ -12,7 +12,8 @@ import {
 } from "@/lib/booking";
 import { chargeLines, checkoutLineItems } from "@/lib/fees";
 import { loadCheckoutFees } from "@/lib/fees-data";
-import { INTRO_CHECKOUT_ID, INTRO_LABEL, INTRO_PRICE_CENTS, isIntro } from "@/lib/intro";
+import { INTRO_CHECKOUT_ID, INTRO_LABEL, INTRO_PRICE_CENTS } from "@/lib/intro";
+import { listedSessionPrice } from "@/lib/private-quarterback-data";
 import { coachAllowsSession } from "@/lib/openings";
 import { personSchema, zodMessage } from "@/lib/validators";
 import { prisma } from "@/lib/prisma";
@@ -22,7 +23,7 @@ import { formatMoney } from "@/lib/money";
 import type { TrainingSession } from "@prisma/client";
 
 async function priceOneTime(session: TrainingSession, promoCode?: string | null) {
-  const listPrice = isIntro(session) ? INTRO_PRICE_CENTS : session.priceCents;
+  const listPrice = await listedSessionPrice(session);
   let sessionCents = listPrice;
   let promoName = "";
   const promo = promoCode ? await findActivePromo(promoCode) : null;

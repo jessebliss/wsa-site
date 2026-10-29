@@ -45,7 +45,11 @@ export function offeringRank(session: OfferingSession) {
 }
 
 export function sessionCoachNames(session: { kind: string; coach: string | null; coaches?: string[] | null }) {
-  if (session.kind === "GROUP") return (session.coaches ?? []).filter(Boolean);
+  if (session.kind === "GROUP") {
+    const listed = (session.coaches ?? []).filter(Boolean);
+    if (listed.length > 0) return listed;
+    return session.coach ? [session.coach] : [];
+  }
   return session.coach ? [session.coach] : [];
 }
 

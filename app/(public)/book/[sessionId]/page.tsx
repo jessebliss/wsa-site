@@ -4,7 +4,7 @@ import { CheckoutForm } from "@/components/checkout-form";
 import { countOccupied } from "@/lib/booking";
 import { chargeLines, checkoutLineItems } from "@/lib/fees";
 import { loadCheckoutFees } from "@/lib/fees-data";
-import { INTRO_PRICE_CENTS, isIntro } from "@/lib/intro";
+import { listedSessionPrice } from "@/lib/private-quarterback-data";
 import { formatMoney } from "@/lib/money";
 import { coachAllowsSession } from "@/lib/openings";
 import { prisma } from "@/lib/prisma";
@@ -27,7 +27,7 @@ export default async function SessionCheckoutPage({
     where: { isCurrent: true },
     orderBy: { createdAt: "desc" },
   });
-  const listPrice = isIntro(session) ? INTRO_PRICE_CENTS : session.priceCents;
+  const listPrice = await listedSessionPrice(session);
   const charge = chargeLines(listPrice, await loadCheckoutFees());
   const lines = checkoutLineItems(charge);
 

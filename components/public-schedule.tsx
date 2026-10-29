@@ -4,21 +4,24 @@ import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { bookPrivateQuarterbackHour } from "@/app/(public)/private-lesson";
-import { MonthCalendar } from "@/components/month-calendar";
+import { CalendarLegend } from "@/components/calendar-legend";
+import { MonthCalendar, type CalendarBlock } from "@/components/month-calendar";
 import { Badge } from "@/components/ui/badge";
 import { type OpeningsByCoach } from "@/lib/availability";
-import { INTRO_KEY, INTRO_LABEL, INTRO_NOTE, INTRO_PRICE_CENTS } from "@/lib/intro";
+import { INTRO_KEY, INTRO_LABEL, INTRO_NOTE, INTRO_PRICE_CENTS, isIntro } from "@/lib/intro";
 import { formatMoney } from "@/lib/money";
 import {
   PRIVATE_QUARTERBACK_KEY,
   PRIVATE_QUARTERBACK_LABEL,
   coachHasLogin,
+  SPEED_PROGRAM,
+  isPrivateQuarterback,
   openPrivateHours,
   type OpenPrivateHour,
   type PrivateHourSession,
 } from "@/lib/private-quarterback";
 import { offeringKey, offeringLabel, offeringRank, openSessions, sessionCoachNames, sessionsOnDay } from "@/lib/schedule-filter";
-import { dayKeysForMonth, etDayKey, etToUtc, formatEt, formatEtDate, formatEtTime } from "@/lib/time";
+import { dayKeysForMonth, etDayKey, etToUtc, formatEt, formatEtTime } from "@/lib/time";
 
 export type ScheduleSession = {
   id: string;
@@ -112,6 +115,8 @@ export function PublicSchedule({
   initialOffering = "",
   initialCoach = "",
   initialStep = 1,
+  speedPrices = {},
+  savedPrivatePrices = {},
   children,
 }: {
   sessions: ScheduleSession[];
@@ -125,12 +130,17 @@ export function PublicSchedule({
   initialOffering?: string;
   initialCoach?: string;
   initialStep?: 1 | 2 | 3;
+  /** Saved public speed prices, keyed by coach. Missing means the session price. */
+  speedPrices?: Record<string, number>;
+  /** Saved private quarterback prices. Missing means the lesson keeps its own price. */
+  savedPrivatePrices?: Record<string, number>;
   children?: ReactNode;
 }) {
   const [step, setStep] = useState<1 | 2 | 3>(initialStep);
   const [offeringId, setOfferingId] = useState(initialOffering);
   const [coach, setCoach] = useState(initialCoach);
   const [showGroups, setShowGroups] = useState(false);
+  const [groupMonth, setGroupMonth] = useState(currentMonth);
   const [month, setMonth] = useState(currentMonth);
   const [day, setDay] = useState("");
 
@@ -158,7 +168,8 @@ export function PublicSchedule({
       if (offeringKey(session) !== offeringId) continue;
       for (const name of sessionCoachNames(session)) {
         const list = prices.get(name) ?? [];
-        list.push(session.priceCents);
+        const speed = offeringId === `program:${SPEED_PROGRAM}` ? speedPrices[name] : undefined;
+        list.push(speed ?? session.priceCents);
         prices.set(name, list);
       }
     }
@@ -169,7 +180,7 @@ export function PublicSchedule({
         const bi = order.indexOf(b.name);
         return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi) || a.name.localeCompare(b.name);
       });
-  }, [bookable, offeringId, portraits]);
+  }, [bookable, offeringId, portraits, speedPrices]);
 
   const offering = offerings.find((item) => item.id === offeringId);
   const privateBooking = offeringId === PRIVATE_QUARTERBACK_KEY;
@@ -242,19 +253,43 @@ export function PublicSchedule({
     step === 1 ? "Choose your training" : step === 2 ? "Choose your coach" : day ? "Choose a time" : coach ? `${possessive(coach)} calendar` : "Choose a day";
   const trail = offering && step > 1 ? offering.label : "";
   const coachPhoto = portraits[coach] ?? "";
-  const groupSchedule = useMemo(() => {
-    const rows = sessions
-      .filter((session) => session.kind === "GROUP" && session.program !== INTRO_LABEL && sessionCoachNames(session).length > 0)
-      .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
-    const byDay = new Map<string, ScheduleSession[]>();
-    for (const session of rows) {
-      const key = etDayKey(new Date(session.startsAt));
-      const list = byDay.get(key) ?? [];
-      list.push(session);
-      byDay.set(key, list);
-    }
-    return Array.from(byDay.entries());
+  const groupBlocks = useMemo<CalendarBlock[]>(() => {
+    return sessions
+      .filter((session) => session.kind === "GROUP" && !isIntro(session) && sessionCoachNames(session).length > 0)
+      .map((session) => ({
+        id: session.id,
+        dayKey: etDayKey(new Date(session.startsAt)),
+        title: session.title,
+        time: formatEtTime(new Date(session.startsAt)),
+        tone: "group" as const,
+        canceled: session.status === "CANCELED",
+        href: session.status === "CANCELED" ? undefined : `/book/${session.id}`,
+      }));
   }, [sessions]);
+  const coachBlocks = useMemo<CalendarBlock[]>(() => {
+    if (!coach) return [];
+    return sessions
+      .filter((session) => {
+        if (session.kind !== "GROUP" && session.kind !== "PRIVATE") return false;
+        if (isIntro(session)) return false;
+        return sessionCoachNames(session).includes(coach);
+      })
+      .map((session) => ({
+        id: session.id,
+        dayKey: etDayKey(new Date(session.startsAt)),
+        title: session.title,
+        time: formatEtTime(new Date(session.startsAt)),
+        tone: session.kind === "PRIVATE" ? ("private" as const) : ("group" as const),
+        canceled: session.status === "CANCELED",
+        href: session.status === "CANCELED" ? undefined : `/book/${session.id}`,
+      }));
+  }, [sessions, coach]);
+
+  function shownPrice(session: ScheduleSession) {
+    if (session.program === SPEED_PROGRAM && speedPrices[coach] != null) return speedPrices[coach];
+    if (isPrivateQuarterback(session) && savedPrivatePrices[coach] != null) return savedPrivatePrices[coach];
+    return session.priceCents;
+  }
 
   return (
     <>
@@ -282,33 +317,26 @@ export function PublicSchedule({
           <p className="text-sm text-muted-foreground">{step} of 3</p>
         </div>
         {showGroups ? (
-          <div className="mt-4 rounded-2xl bg-white p-4" data-group-schedule="open">
+          <div className="mt-4" data-group-schedule="open">
             <h2 className="font-display text-3xl uppercase">Group schedule</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Upcoming group training. Booking is still the steps below.</p>
-            {groupSchedule.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">No group sessions are on the calendar yet.</p>
-            ) : (
-              <div className="mt-4 space-y-5">
-                {groupSchedule.map(([dayKey, rows]) => (
-                  <div key={dayKey} data-group-day={dayKey}>
-                    <h3 className="font-display text-xl uppercase">{formatEtDate(etToUtc(dayKey, "12:00"))}</h3>
-                    <ul className="mt-2 space-y-3">
-                      {rows.map((session) => (
-                        <li key={session.id} className="border-t border-border pt-3 text-sm">
-                          <p className="font-semibold">{session.title}</p>
-                          <p>
-                            {formatEtTime(new Date(session.startsAt))}–{formatEtTime(new Date(session.endsAt))} ET
-                            {` · ${sessionCoachNames(session).join(", ")}`}
-                          </p>
-                          {session.status === "CANCELED" ? <p className="font-semibold">Canceled</p> : null}
-                          <p className="text-muted-foreground">{session.location}</p>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            )}
+            <p className="mt-1 text-sm text-muted-foreground">Group sessions on the month. Booking is still the steps below. Canceled sessions stay faded and do not hold the time.</p>
+            <div className="mt-3">
+              <CalendarLegend />
+              <MonthCalendar
+                month={groupMonth}
+                minMonth={currentMonth}
+                maxMonth={maxMonth}
+                todayKey={todayKey}
+                selected=""
+                marked={[]}
+                events={groupBlocks}
+                onSelect={() => {}}
+                onMonth={setGroupMonth}
+              />
+              {groupBlocks.every((block) => !block.dayKey.startsWith(groupMonth)) ? (
+                <p className="mt-3 text-sm text-muted-foreground">No group sessions this month.</p>
+              ) : null}
+            </div>
           </div>
         ) : null}
         {step === 3 && coach ? (
@@ -404,6 +432,7 @@ export function PublicSchedule({
 
         {step === 3 ? (
           <div className="mt-4">
+            <CalendarLegend />
             <MonthCalendar
               month={month}
               minMonth={currentMonth}
@@ -413,13 +442,14 @@ export function PublicSchedule({
               marked={Object.keys(counts)}
               counts={counts}
               onlyOpen
+              events={coachBlocks}
               onSelect={setDay}
               onMonth={(next) => {
                 setMonth(next);
                 setDay("");
               }}
             />
-            {Object.keys(counts).length === 0 ? (
+            {Object.keys(counts).length === 0 && coachBlocks.every((block) => !block.dayKey.startsWith(month)) ? (
               <p className="mt-4 text-sm text-muted-foreground">No open days this month.</p>
             ) : null}
             {day && usesAvailability ? (
@@ -430,7 +460,7 @@ export function PublicSchedule({
                 <div className="mt-3 space-y-3" data-times="hours">
                   {dayHours.map((slot) => {
                     const existing = sessions.find((session) => session.id === slot.sessionId);
-                    const priceCents = existing?.priceCents ?? privatePrice;
+                    const priceCents = savedPrivatePrices[coach] ?? existing?.priceCents ?? privatePrice;
                     return (
                       <form key={slot.hour} action={bookPrivateQuarterbackHour}>
                         <input type="hidden" name="coach" value={coach} />
@@ -467,7 +497,7 @@ export function PublicSchedule({
                           <Badge>{session.kind === "GROUP" ? "Group" : session.kind === "CAMP" ? "Camp" : "Private"}</Badge>
                           <h4 className="mt-2 font-display text-2xl uppercase leading-none">{session.title}</h4>
                         </div>
-                        <p className="text-right font-display text-2xl">{formatMoney(session.priceCents)}</p>
+                        <p className="text-right font-display text-2xl">{formatMoney(shownPrice(session))}</p>
                       </div>
                       <div className="mt-3 flex items-end justify-between gap-3 text-sm">
                         <p>

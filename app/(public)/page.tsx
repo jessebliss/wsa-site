@@ -4,8 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { occupiedCounts } from "@/lib/booking";
 import { formatMoney } from "@/lib/money";
 import { loadOpenings } from "@/lib/openings";
-import { isPrivateQuarterback, matchCoachName } from "@/lib/private-quarterback";
-import { loadPrivateQuarterbackPrices, privateQuarterbackCoachNames } from "@/lib/private-quarterback-data";
+import { SPEED_PROGRAM, isPrivateQuarterback, matchCoachName } from "@/lib/private-quarterback";
+import { loadPrivateQuarterbackPrices, loadSavedPrivatePrices, loadSavedSpeedPrices, privateQuarterbackCoachNames } from "@/lib/private-quarterback-data";
+import { sessionCoachNames } from "@/lib/schedule-filter";
 import { etDayKey, etToUtc, shiftMonth } from "@/lib/time";
 import { PublicSchedule } from "@/components/public-schedule";
 import { extendSeriesHorizon } from "@/lib/series";
@@ -48,9 +49,26 @@ export default async function SchedulePage({
   for (const name of Object.keys(openings)) {
     if (!privateCoachNames.includes(name)) privateCoachNames.push(name);
   }
-  const linkedCoach = query.training === "quarterback" ? matchCoachName(query.coach ?? "", privateCoachNames) : "";
-  if (linkedCoach && !privateCoachNames.includes(linkedCoach)) privateCoachNames.push(linkedCoach);
-  const privatePrices = await loadPrivateQuarterbackPrices(privateCoachNames);
+  const speedCoachNames = Array.from(
+    new Set(
+      sessions
+        .filter((session) => session.program === SPEED_PROGRAM)
+        .flatMap((session) => sessionCoachNames(session)),
+    ),
+  );
+  const wantsSpeed = query.training === "speed";
+  const wantsQuarterback = query.training === "quarterback";
+  const linkedCoach = wantsQuarterback
+    ? matchCoachName(query.coach ?? "", privateCoachNames)
+    : wantsSpeed
+      ? matchCoachName(query.coach ?? "", speedCoachNames)
+      : "";
+  if (wantsQuarterback && linkedCoach && !privateCoachNames.includes(linkedCoach)) privateCoachNames.push(linkedCoach);
+  const [privatePrices, speedPrices, savedPrivatePrices] = await Promise.all([
+    loadPrivateQuarterbackPrices(privateCoachNames),
+    loadSavedSpeedPrices(),
+    loadSavedPrivatePrices(),
+  ]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
@@ -67,9 +85,11 @@ export default async function SchedulePage({
         openings={openings}
         portraits={Object.fromEntries(coaches.map((coach) => [coach.name, coach.photo]))}
         nowIso={new Date().toISOString()}
-        initialOffering={linkedCoach ? "private:quarterback" : ""}
+        initialOffering={wantsSpeed && linkedCoach ? `program:${SPEED_PROGRAM}` : wantsQuarterback && linkedCoach ? "private:quarterback" : ""}
         initialCoach={linkedCoach}
         initialStep={linkedCoach ? 3 : 1}
+        speedPrices={speedPrices}
+        savedPrivatePrices={savedPrivatePrices}
         privateCoaches={privateCoachNames.map((name) => ({ name, priceCents: privatePrices[name] ?? 0 }))}
         sessions={sessions.map((session) => ({
           id: session.id,
