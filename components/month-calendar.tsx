@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { weekdayIndexForDayKey } from "@/lib/availability";
 import { dayKeysForMonth, etToUtc, formatEt, formatMonthLabel } from "@/lib/time";
@@ -11,18 +12,22 @@ export type CalendarBlock = {
   dayKey: string;
   title: string;
   time: string;
-  tone: "group" | "private";
+  when: string;
+  startsAt: string;
+  program: string;
+  coaches: string;
+  location: string;
+  color: string;
+  colorId: string;
   canceled: boolean;
   href?: string;
 };
 
-function blockClass(tone: CalendarBlock["tone"], canceled: boolean) {
+function blockStyle(color: string, canceled: boolean): CSSProperties {
   if (canceled) {
-    return tone === "private"
-      ? "bg-private/20 text-private line-through"
-      : "bg-group/20 text-group line-through";
+    return { backgroundColor: `${color}33`, color, textDecoration: "line-through" };
   }
-  return tone === "private" ? "bg-private text-white" : "bg-group text-white";
+  return { backgroundColor: color, color: "#fff" };
 }
 
 export function MonthCalendar({
@@ -115,7 +120,8 @@ export function MonthCalendar({
           const count = counts?.[key] ?? 0;
           const open = counts ? count > 0 : marks.has(key);
           const dayEvents = eventsByDay.get(key) ?? [];
-          const disabled = past || (onlyOpen && !open && dayEvents.length === 0);
+          const canSelect = dayEvents.length > 0 || (!past && !(onlyOpen && !open));
+          const disabled = !canSelect;
           const label = formatEt(etToUtc(key, "12:00"), { weekday: "long", month: "long", day: "numeric" });
           const status = counts
             ? open
@@ -129,24 +135,31 @@ export function MonthCalendar({
               <div
                 key={key}
                 data-date={key}
+                data-selected={isSelected ? "yes" : "no"}
                 data-count={counts ? String(count) : undefined}
+                onClick={() => {
+                  if (canSelect) onSelect(key);
+                }}
                 className={`flex min-h-20 flex-col rounded-lg p-0.5 sm:min-h-24 ${
-                  isSelected ? "bg-primary text-white" : past ? "text-muted-foreground/50" : open && onlyOpen ? "bg-primary/10" : "bg-muted/40"
+                  isSelected ? "ring-2 ring-ink" : past ? "text-muted-foreground/50" : open && onlyOpen ? "bg-primary/10" : "bg-muted/40"
                 }`}
               >
                 <button
                   type="button"
-                  disabled={past || (onlyOpen && !open)}
+                  disabled={!canSelect}
                   aria-pressed={isSelected}
                   aria-label={`${label}${status}`}
-                  onClick={() => onSelect(key)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (canSelect) onSelect(key);
+                  }}
                   className="px-0.5 text-left text-[11px] font-semibold disabled:cursor-default"
                 >
                   {Number(key.slice(-2))}
                 </button>
-                <div className="mt-0.5 flex flex-col gap-0.5">
+                <div className="mt-0.5 flex flex-col gap-0.5" onClick={(event) => event.stopPropagation()}>
                   {dayEvents.map((event) => {
-                    const className = `block rounded-sm px-1 py-0.5 text-left text-[10px] font-semibold leading-tight ${blockClass(event.tone, event.canceled)}`;
+                    const className = "block rounded-sm px-1 py-0.5 text-left text-[10px] font-semibold leading-tight";
                     const text = (
                       <>
                         <span className="block truncate">{event.time}</span>
@@ -159,9 +172,10 @@ export function MonthCalendar({
                           key={event.id}
                           href={event.href}
                           data-event={event.id}
-                          data-tone={event.tone}
+                          data-color={event.colorId}
                           data-canceled={event.canceled ? "yes" : "no"}
                           className={className}
+                          style={blockStyle(event.color, event.canceled)}
                         >
                           {text}
                         </Link>
@@ -171,9 +185,10 @@ export function MonthCalendar({
                       <span
                         key={event.id}
                         data-event={event.id}
-                        data-tone={event.tone}
+                        data-color={event.colorId}
                         data-canceled={event.canceled ? "yes" : "no"}
                         className={className}
+                        style={blockStyle(event.color, event.canceled)}
                       >
                         {text}
                       </span>

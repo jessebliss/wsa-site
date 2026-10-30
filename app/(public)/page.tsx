@@ -3,6 +3,7 @@ import { coaches } from "@/lib/content";
 import { prisma } from "@/lib/prisma";
 import { occupiedCounts } from "@/lib/booking";
 import { formatMoney } from "@/lib/money";
+import { planCadence } from "@/lib/plan-options";
 import { loadOpenings } from "@/lib/openings";
 import { SPEED_PROGRAM, isPrivateQuarterback, matchCoachName } from "@/lib/private-quarterback";
 import { loadPrivateQuarterbackPrices, loadSavedPrivatePrices, loadSavedSpeedPrices, privateQuarterbackCoachNames } from "@/lib/private-quarterback-data";
@@ -90,6 +91,12 @@ export default async function SchedulePage({
         initialStep={linkedCoach ? 3 : 1}
         speedPrices={speedPrices}
         savedPrivatePrices={savedPrivatePrices}
+        plans={plans.map((plan) => ({
+          program: plan.program,
+          color: plan.color,
+          active: plan.active,
+          sortOrder: plan.sortOrder,
+        }))}
         privateCoaches={privateCoachNames.map((name) => ({ name, priceCents: privatePrices[name] ?? 0 }))}
         sessions={sessions.map((session) => ({
           id: session.id,
@@ -108,9 +115,9 @@ export default async function SchedulePage({
         }))}
       >
         <section id="plans" className="mt-12 scroll-mt-24">
-          <h2 className="font-display text-4xl uppercase">Monthly plans</h2>
+          <h2 className="font-display text-4xl uppercase">Plans</h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Each plan is a number of group sessions in that program. Unused sessions do not roll over. Camps and private lessons are not included.
+            Each plan is a number of group sessions in that program, billed monthly or once a year. Unused sessions do not roll over. Camps and private lessons are not included.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {plans.length === 0 ? (
@@ -120,8 +127,10 @@ export default async function SchedulePage({
                 <Link key={plan.id} href={`/plans/${plan.id}`} className="rounded-2xl bg-white p-5">
                   <p className="text-xs font-semibold uppercase tracking-wide text-primary">{plan.program}</p>
                   <h3 className="font-display text-3xl uppercase">{plan.name}</h3>
-                  <p className="mt-2 font-display text-4xl">{formatMoney(plan.priceCents)}<span className="text-base"> / month</span></p>
-                  <p className="mt-1 text-sm">{plan.sessionsPerMonth} group sessions each month</p>
+                  <p className="mt-2 font-display text-4xl" data-plan-cadence={planCadence(plan.billingInterval)}>
+                    {formatMoney(plan.priceCents)}<span className="text-base"> {planCadence(plan.billingInterval)}</span>
+                  </p>
+                  <p className="mt-1 text-sm">{plan.sessionsPerMonth} group sessions {plan.billingInterval === "YEAR" ? "each year" : "each month"}</p>
                 </Link>
               ))
             )}

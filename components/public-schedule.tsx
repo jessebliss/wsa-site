@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { bookPrivateQuarterbackHour } from "@/app/(public)/private-lesson";
-import { CalendarLegend } from "@/components/calendar-legend";
+import { CalendarLegend, legendItems } from "@/components/calendar-legend";
+import { DayEventsPanel } from "@/components/day-events";
 import { MonthCalendar, type CalendarBlock } from "@/components/month-calendar";
 import { Badge } from "@/components/ui/badge";
 import { type OpeningsByCoach } from "@/lib/availability";
@@ -20,6 +21,7 @@ import {
   type OpenPrivateHour,
   type PrivateHourSession,
 } from "@/lib/private-quarterback";
+import { colorForProgram, type PlanColorSource } from "@/lib/plan-options";
 import { offeringKey, offeringLabel, offeringRank, openSessions, sessionCoachNames, sessionsOnDay } from "@/lib/schedule-filter";
 import { dayKeysForMonth, etDayKey, etToUtc, formatEt, formatEtTime } from "@/lib/time";
 
@@ -56,6 +58,27 @@ function initials(name: string) {
 
 function possessive(name: string) {
   return /s$/i.test(name) ? `${name}'` : `${name}'s`;
+}
+
+function sessionBlock(session: ScheduleSession, plans: PlanColorSource[]): CalendarBlock {
+  const color = colorForProgram(session.program, plans);
+  const start = new Date(session.startsAt);
+  const end = new Date(session.endsAt);
+  return {
+    id: session.id,
+    dayKey: etDayKey(start),
+    title: session.title,
+    time: formatEtTime(start),
+    when: `${formatEtTime(start)}–${formatEtTime(end)} ET`,
+    startsAt: session.startsAt,
+    program: session.program,
+    coaches: sessionCoachNames(session).join(", "),
+    location: session.location,
+    color: color.hex,
+    colorId: color.id,
+    canceled: session.status === "CANCELED",
+    href: session.status === "CANCELED" ? undefined : `/book/${session.id}`,
+  };
 }
 
 export type PrivateCoachChoice = {
@@ -117,6 +140,7 @@ export function PublicSchedule({
   initialStep = 1,
   speedPrices = {},
   savedPrivatePrices = {},
+  plans = [],
   children,
 }: {
   sessions: ScheduleSession[];
@@ -134,6 +158,7 @@ export function PublicSchedule({
   speedPrices?: Record<string, number>;
   /** Saved private quarterback prices. Missing means the lesson keeps its own price. */
   savedPrivatePrices?: Record<string, number>;
+  plans?: PlanColorSource[];
   children?: ReactNode;
 }) {
   const [step, setStep] = useState<1 | 2 | 3>(initialStep);
@@ -141,6 +166,7 @@ export function PublicSchedule({
   const [coach, setCoach] = useState(initialCoach);
   const [showGroups, setShowGroups] = useState(false);
   const [groupMonth, setGroupMonth] = useState(currentMonth);
+  const [groupDay, setGroupDay] = useState("");
   const [month, setMonth] = useState(currentMonth);
   const [day, setDay] = useState("");
 
@@ -230,6 +256,7 @@ export function PublicSchedule({
       setDay("");
       setMonth(currentMonth);
     }
+    setGroupDay("");
     setOfferingId(id);
     setStep(2);
   }
@@ -246,44 +273,36 @@ export function PublicSchedule({
   function back() {
     setDay("");
     if (step === 3) setStep(2);
-    else setStep(1);
+    else {
+      setGroupDay("");
+      setStep(1);
+    }
   }
 
   const question =
     step === 1 ? "Choose your training" : step === 2 ? "Choose your coach" : day ? "Choose a time" : coach ? `${possessive(coach)} calendar` : "Choose a day";
   const trail = offering && step > 1 ? offering.label : "";
   const coachPhoto = portraits[coach] ?? "";
+  const scopedTraining = step > 1 ? offeringId : "";
   const groupBlocks = useMemo<CalendarBlock[]>(() => {
     return sessions
-      .filter((session) => session.kind === "GROUP" && !isIntro(session) && sessionCoachNames(session).length > 0)
-      .map((session) => ({
-        id: session.id,
-        dayKey: etDayKey(new Date(session.startsAt)),
-        title: session.title,
-        time: formatEtTime(new Date(session.startsAt)),
-        tone: "group" as const,
-        canceled: session.status === "CANCELED",
-        href: session.status === "CANCELED" ? undefined : `/book/${session.id}`,
-      }));
-  }, [sessions]);
+      .filter((session) => {
+        if (session.kind !== "GROUP" || isIntro(session) || sessionCoachNames(session).length === 0) return false;
+        return !scopedTraining || offeringKey(session) === scopedTraining;
+      })
+      .map((session) => sessionBlock(session, plans));
+  }, [sessions, scopedTraining, plans]);
   const coachBlocks = useMemo<CalendarBlock[]>(() => {
     if (!coach) return [];
     return sessions
       .filter((session) => {
-        if (session.kind !== "GROUP" && session.kind !== "PRIVATE") return false;
         if (isIntro(session)) return false;
+        if (session.kind !== "GROUP" && session.kind !== "PRIVATE" && session.kind !== "CAMP") return false;
+        if (offeringId && offeringKey(session) !== offeringId) return false;
         return sessionCoachNames(session).includes(coach);
       })
-      .map((session) => ({
-        id: session.id,
-        dayKey: etDayKey(new Date(session.startsAt)),
-        title: session.title,
-        time: formatEtTime(new Date(session.startsAt)),
-        tone: session.kind === "PRIVATE" ? ("private" as const) : ("group" as const),
-        canceled: session.status === "CANCELED",
-        href: session.status === "CANCELED" ? undefined : `/book/${session.id}`,
-      }));
-  }, [sessions, coach]);
+      .map((session) => sessionBlock(session, plans));
+  }, [sessions, coach, offeringId, plans]);
 
   function shownPrice(session: ScheduleSession) {
     if (session.program === SPEED_PROGRAM && speedPrices[coach] != null) return speedPrices[coach];
@@ -319,23 +338,31 @@ export function PublicSchedule({
         {showGroups ? (
           <div className="mt-4" data-group-schedule="open">
             <h2 className="font-display text-3xl uppercase">Group schedule</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Group sessions on the month. Booking is still the steps below. Canceled sessions stay faded and do not hold the time.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {scopedTraining
+                ? "Only the training you chose. Go back to see the others. Tap a day to list it under the calendar. Canceled sessions stay faded."
+                : "Group sessions on the month. Choose a training and this calendar keeps only that training. Tap a day to list it under the calendar."}
+            </p>
             <div className="mt-3">
-              <CalendarLegend />
+              <CalendarLegend items={legendItems(groupBlocks.filter((block) => block.dayKey.startsWith(groupMonth)))} />
               <MonthCalendar
                 month={groupMonth}
                 minMonth={currentMonth}
                 maxMonth={maxMonth}
                 todayKey={todayKey}
-                selected=""
+                selected={groupDay}
                 marked={[]}
                 events={groupBlocks}
-                onSelect={() => {}}
-                onMonth={setGroupMonth}
+                onSelect={setGroupDay}
+                onMonth={(next) => {
+                  setGroupMonth(next);
+                  setGroupDay("");
+                }}
               />
               {groupBlocks.every((block) => !block.dayKey.startsWith(groupMonth)) ? (
                 <p className="mt-3 text-sm text-muted-foreground">No group sessions this month.</p>
               ) : null}
+              <DayEventsPanel dayKey={groupDay} events={groupBlocks} />
             </div>
           </div>
         ) : null}
@@ -432,7 +459,7 @@ export function PublicSchedule({
 
         {step === 3 ? (
           <div className="mt-4">
-            <CalendarLegend />
+            <CalendarLegend items={legendItems(coachBlocks.filter((block) => block.dayKey.startsWith(month)))} />
             <MonthCalendar
               month={month}
               minMonth={currentMonth}
@@ -452,6 +479,7 @@ export function PublicSchedule({
             {Object.keys(counts).length === 0 && coachBlocks.every((block) => !block.dayKey.startsWith(month)) ? (
               <p className="mt-4 text-sm text-muted-foreground">No open days this month.</p>
             ) : null}
+            <DayEventsPanel dayKey={day} events={coachBlocks} />
             {day && usesAvailability ? (
               <>
                 <h3 className="mt-4 font-display text-2xl uppercase">

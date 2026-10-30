@@ -60,6 +60,11 @@ enum PaymentMethod {
   VENMO
 }
 
+enum BillingInterval {
+  MONTH
+  YEAR
+}
+
 model Plan {
   id               String         @id @default(cuid())
   seedKey          String?        @unique
@@ -67,6 +72,8 @@ model Plan {
   program          String
   sessionsPerMonth Int
   priceCents       Int
+  billingInterval  BillingInterval @default(MONTH)
+  color            String          @default("red")
   stripeProductId  String?
   stripePriceId    String?
   active           Boolean        @default(true)

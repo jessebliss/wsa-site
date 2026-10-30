@@ -85,7 +85,7 @@ export default async function SubscriptionsPage({
             <option value="" disabled>Choose</option>
             {plans.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.name} · {formatMoney(item.priceCents)} · {item.sessionsPerMonth}/mo
+                {item.name} · {formatMoney(item.priceCents)} {item.billingInterval === "YEAR" ? "per year" : "per month"} · {item.sessionsPerMonth} sessions
               </option>
             ))}
           </select>

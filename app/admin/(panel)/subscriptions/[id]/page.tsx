@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { centsToDollarInput, formatMoney } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { subscriptionPlanName } from "@/lib/subscription-admin";
+import { planCadence } from "@/lib/plan-options";
 import { formatEtDate } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +35,7 @@ export default async function SubscriptionDetail({
       <h1 className="mt-2 font-display text-4xl uppercase">{sub.playerName}</h1>
       <p className="text-sm">{sub.parentName} · {sub.email} · {sub.phone}</p>
       <p className="mt-2 text-sm font-semibold">
-        {sub.paymentMethod === "VENMO" ? "Venmo" : "Stripe"} · {sub.status}{sub.cancelAtPeriodEnd ? " · cancels at period end" : ""} · {formatMoney(sub.priceCents)} / month
+        {sub.paymentMethod === "VENMO" ? "Venmo" : "Stripe"} · {sub.status}{sub.cancelAtPeriodEnd ? " · cancels at period end" : ""} · {formatMoney(sub.priceCents)} {planCadence(sub.plan?.billingInterval)}
       </p>
       <p className="text-sm text-muted-foreground">
         {subscriptionPlanName(sub)} · {sub.sessionsUsed} of {sub.sessionsIncluded} used
@@ -72,7 +73,7 @@ export default async function SubscriptionDetail({
           <p className="text-xs text-muted-foreground">Stripe prorates the difference and invoices it now. This person moves to the new plan&apos;s price and session count.</p>
           <select id="planId" name="planId" className="mt-2 h-11 w-full rounded-md border border-border px-3" defaultValue={sub.planId ?? ""}>
             {plans.map((plan) => (
-              <option key={plan.id} value={plan.id}>{plan.name} · {formatMoney(plan.priceCents)} · {plan.sessionsPerMonth}/mo</option>
+              <option key={plan.id} value={plan.id}>{plan.name} · {formatMoney(plan.priceCents)} {planCadence(plan.billingInterval)} · {plan.sessionsPerMonth} sessions</option>
             ))}
           </select>
           <Button className="mt-3 w-full" type="submit">Update plan</Button>

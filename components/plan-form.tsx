@@ -11,10 +11,12 @@ export function PlanForm({
   planId,
   priceCents,
   waiver,
+  cadence = "Monthly",
 }: {
   planId: string;
   priceCents: number;
   waiver: string;
+  cadence?: string;
 }) {
   const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState("");
@@ -49,7 +51,7 @@ export function PlanForm({
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="rounded-xl bg-ink px-4 py-3 text-white">
-        <p className="text-xs uppercase tracking-[0.16em] text-white/60">Monthly</p>
+        <p className="text-xs uppercase tracking-[0.16em] text-white/60">{cadence}</p>
         <p className="font-display text-4xl">{formatMoney(priceCents)}</p>
         <p className="text-sm text-white/80">Promo codes do not apply to memberships.</p>
       </div>

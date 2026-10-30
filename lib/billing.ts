@@ -73,7 +73,8 @@ export async function ensurePlanStripePrice(plan: Plan) {
   const stripe = getStripe();
   if (plan.stripePriceId) {
     const price = await stripe.prices.retrieve(plan.stripePriceId);
-    if (price.unit_amount === plan.priceCents && price.active) return plan;
+    const interval = plan.billingInterval === "YEAR" ? "year" : "month";
+    if (price.unit_amount === plan.priceCents && price.active && price.recurring?.interval === interval) return plan;
   }
   let productId = plan.stripeProductId;
   if (!productId) {
@@ -87,7 +88,7 @@ export async function ensurePlanStripePrice(plan: Plan) {
     product: productId,
     unit_amount: plan.priceCents,
     currency: "usd",
-    recurring: { interval: "month" },
+    recurring: { interval: plan.billingInterval === "YEAR" ? "year" : "month" },
     nickname: `${plan.name} ${plan.priceCents}`,
   });
   return prisma.plan.update({
@@ -291,7 +292,7 @@ async function sendSubscriptionReceipt(subscriptionId: string) {
       `Player: ${sub.playerName}`,
       `Parent: ${sub.parentName}`,
       `Plan: ${sub.plan?.name || sub.planName || "Membership"}`,
-      `Amount: ${formatMoney(sub.priceCents)} per month`,
+      `Amount: ${formatMoney(sub.priceCents)} ${sub.plan?.billingInterval === "YEAR" ? "per year" : "per month"}`,
       `Group sessions this period: ${sub.sessionsIncluded}`,
       "Unused sessions expire at the end of the billing period and do not roll over.",
       "Camps and private lessons are paid separately.",

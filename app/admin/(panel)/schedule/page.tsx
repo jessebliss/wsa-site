@@ -1,8 +1,10 @@
 import { AdminError } from "@/components/admin-error";
 import { AdminMonthSchedule } from "@/components/admin-month-schedule";
 import { SessionForm } from "@/components/session-form";
+import { colorForProgram } from "@/lib/plan-options";
 import { blankSessionValues } from "@/lib/session-defaults";
 import { loadCoachRoster } from "@/lib/roster";
+import { sessionCoachNames } from "@/lib/schedule-filter";
 import { extendSeriesHorizon } from "@/lib/series";
 import { prisma } from "@/lib/prisma";
 import { PARK } from "@/lib/utils";
@@ -21,7 +23,7 @@ export default async function ScheduleAdmin({
   await extendSeriesHorizon(today);
   const minMonth = shiftMonth(today.slice(0, 7), -12);
   const maxMonth = shiftMonth(today.slice(0, 7), 8);
-  const [sessions, roster] = await Promise.all([
+  const [sessions, roster, plans] = await Promise.all([
     prisma.trainingSession.findMany({
       where: {
         startsAt: {
@@ -32,6 +34,7 @@ export default async function ScheduleAdmin({
       orderBy: { startsAt: "asc" },
     }),
     loadCoachRoster(),
+    prisma.plan.findMany({ select: { program: true, color: true, active: true, sortOrder: true } }),
   ]);
 
   return (
@@ -51,15 +54,24 @@ export default async function ScheduleAdmin({
         todayKey={today}
         minMonth={minMonth}
         maxMonth={maxMonth}
-        events={sessions.map((session) => ({
-          id: session.id,
-          dayKey: etDayKey(session.startsAt),
-          title: session.title,
-          time: formatEtTime(session.startsAt),
-          tone: session.kind === "PRIVATE" ? "private" : "group",
-          canceled: session.status === "CANCELED",
-          href: `/admin/schedule/${session.id}`,
-        }))}
+        events={sessions.map((session) => {
+          const color = colorForProgram(session.program, plans);
+          return {
+            id: session.id,
+            dayKey: etDayKey(session.startsAt),
+            title: session.title,
+            time: formatEtTime(session.startsAt),
+            when: `${formatEtTime(session.startsAt)}–${formatEtTime(session.endsAt)} ET`,
+            startsAt: session.startsAt.toISOString(),
+            program: session.program,
+            coaches: sessionCoachNames(session).join(", "),
+            location: session.location,
+            color: color.hex,
+            colorId: color.id,
+            canceled: session.status === "CANCELED",
+            href: `/admin/schedule/${session.id}`,
+          };
+        })}
       />
     </div>
   );

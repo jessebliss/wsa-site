@@ -61,7 +61,7 @@ export async function setCustomPrice(id: string, priceCents: number) {
     product: pricedPlan.stripeProductId,
     unit_amount: priceCents,
     currency: "usd",
-    recurring: { interval: "month" },
+    recurring: { interval: local.plan.billingInterval === "YEAR" ? "year" : "month" },
     nickname: `Custom ${local.email}`,
   });
   const remote = await stripe.subscriptions.retrieve(local.stripeSubscriptionId!);

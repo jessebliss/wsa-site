@@ -1,11 +1,32 @@
 import { deletePlan, savePlan } from "@/app/admin/(panel)/actions";
 import { AdminError } from "@/components/admin-error";
+import { ColorSwatches } from "@/components/color-swatches";
 import { ConfirmForm } from "@/components/confirm-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { centsToDollarInput, formatMoney } from "@/lib/money";
+import { eventColor, planCadence } from "@/lib/plan-options";
 import { prisma } from "@/lib/prisma";
+
+function BillingChoice({ yearly }: { yearly: boolean }) {
+  return (
+    <fieldset className="sm:col-span-2">
+      <legend className="text-sm font-semibold">Billing</legend>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <label className="flex min-h-11 items-center gap-2 rounded-full border border-border px-3 text-sm font-semibold">
+          <input type="radio" name="billingInterval" value="MONTH" defaultChecked={!yearly} />
+          Monthly
+        </label>
+        <label className="flex min-h-11 items-center gap-2 rounded-full border border-border px-3 text-sm font-semibold">
+          <input type="radio" name="billingInterval" value="YEAR" defaultChecked={yearly} data-yearly="yes" />
+          Yearly
+        </label>
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">Yearly is one charge per year.</p>
+    </fieldset>
+  );
+}
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Plans" };
@@ -21,7 +42,7 @@ export default async function PlansAdmin({
     <div>
       <h1 className="font-display text-4xl uppercase">Plans and prices</h1>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-        Catalog changes apply to new checkouts. People already subscribed keep their price and session count until you edit that subscription. Session drop-in prices are set on each session.
+        A plan is monthly or yearly. Yearly is one charge per year. The color is one of twelve swatches, and sessions in that program use it on both calendars. Catalog changes apply to new checkouts. People already subscribed keep their price and session count until you edit that subscription.
       </p>
       <AdminError message={params.error} />
       <form action={savePlan} className="mt-4 grid gap-3 rounded-2xl bg-white p-4 sm:grid-cols-2">
@@ -34,13 +55,15 @@ export default async function PlansAdmin({
           <Input className="mt-1" id="program" name="program" required placeholder="Speed & Agility" />
         </div>
         <div>
-          <Label htmlFor="sessionsPerMonth">Sessions per month</Label>
+          <Label htmlFor="sessionsPerMonth">Sessions included</Label>
           <Input className="mt-1" id="sessionsPerMonth" name="sessionsPerMonth" type="number" min={1} required />
         </div>
         <div>
-          <Label htmlFor="price">Monthly price (USD)</Label>
+          <Label htmlFor="price">Price (USD)</Label>
           <Input className="mt-1" id="price" name="price" required />
         </div>
+        <BillingChoice yearly={false} />
+        <ColorSwatches value="red" />
         <label className="flex items-center gap-2 text-sm font-semibold">
           <input type="checkbox" name="active" defaultChecked /> Active
         </label>
@@ -51,14 +74,19 @@ export default async function PlansAdmin({
       <ul className="mt-6 space-y-4">
         {plans.map((plan) => (
           <li key={plan.id} className="rounded-2xl bg-white p-4">
-            <p className="text-sm text-muted-foreground">{plan.active ? "Active" : "Hidden"} · {formatMoney(plan.priceCents)} · {plan.sessionsPerMonth} sessions</p>
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <i className="h-3 w-3 rounded-sm" style={{ backgroundColor: eventColor(plan.color).hex }} aria-hidden="true" />
+              {plan.active ? "Active" : "Hidden"} · {formatMoney(plan.priceCents)} {planCadence(plan.billingInterval)} · {plan.sessionsPerMonth} sessions
+            </p>
             <form action={savePlan} className="mt-3 grid gap-3 sm:grid-cols-2">
               <input type="hidden" name="id" value={plan.id} />
               <input type="hidden" name="sortOrder" value={plan.sortOrder} />
               <Input name="name" defaultValue={plan.name} required aria-label="Name" />
               <Input name="program" defaultValue={plan.program} required aria-label="Program" />
-              <Input name="sessionsPerMonth" type="number" min={1} defaultValue={plan.sessionsPerMonth} required aria-label="Sessions per month" />
+              <Input name="sessionsPerMonth" type="number" min={1} defaultValue={plan.sessionsPerMonth} required aria-label="Sessions included" />
               <Input name="price" defaultValue={centsToDollarInput(plan.priceCents)} required aria-label="Price" />
+              <BillingChoice yearly={plan.billingInterval === "YEAR"} />
+              <ColorSwatches value={plan.color} />
               <label className="flex items-center gap-2 text-sm font-semibold">
                 <input type="checkbox" name="active" defaultChecked={plan.active} /> Active
               </label>

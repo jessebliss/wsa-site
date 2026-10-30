@@ -6,6 +6,7 @@ import { auth, signOut } from "@/lib/auth";
 import { refundRegistration } from "@/lib/billing";
 import { ensurePlanStripePrice } from "@/lib/billing";
 import { dollarsToCents, optionalDollarsToCents } from "@/lib/money";
+import { isEventColorId } from "@/lib/plan-options";
 import { percentToBps } from "@/lib/fees";
 import { prisma } from "@/lib/prisma";
 import { type RepeatRule } from "@/lib/recurrence";
@@ -27,7 +28,7 @@ import { hourStartsForDay } from "@/lib/availability";
 import { hashPassword } from "@/lib/password";
 import { etDayKey, shiftMonth } from "@/lib/time";
 import { normalizeEmail } from "@/lib/utils";
-import { Prisma } from "@prisma/client";
+import { Prisma, type BillingInterval } from "@prisma/client";
 
 async function requireAdmin() {
   const session = await auth();
@@ -264,21 +265,32 @@ export async function savePlan(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") ?? "");
   try {
+    const color = String(formData.get("color") ?? "");
+    const billingValue = String(formData.get("billingInterval") ?? "MONTH");
+    if (!isEventColorId(color)) throw new Error("Choose one of the twelve colors.");
+    if (billingValue !== "MONTH" && billingValue !== "YEAR") throw new Error("Choose monthly or yearly.");
+    const billingInterval: BillingInterval = billingValue === "YEAR" ? "YEAR" : "MONTH";
     const data = {
       name: String(formData.get("name") ?? "").trim(),
       program: String(formData.get("program") ?? "").trim(),
       sessionsPerMonth: Number(formData.get("sessionsPerMonth")),
       priceCents: dollarsToCents(String(formData.get("price") ?? "")),
+      billingInterval,
+      color,
       active: formData.get("active") === "on",
       sortOrder: Number(formData.get("sortOrder") ?? 0) || 0,
     };
     if (!data.name || !data.program) throw new Error("Name and program are required.");
     if (!Number.isInteger(data.sessionsPerMonth) || data.sessionsPerMonth < 1) {
-      throw new Error("Sessions per month has to be at least 1.");
+      throw new Error("Sessions included has to be at least 1.");
     }
     const plan = id
       ? await prisma.plan.update({ where: { id }, data })
       : await prisma.plan.create({ data });
+    await prisma.plan.updateMany({
+      where: { program: data.program, NOT: { id: plan.id } },
+      data: { color: data.color },
+    });
     if (stripeConfigured()) {
       await ensurePlanStripePrice(plan);
     }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PlanForm } from "@/components/plan-form";
 import { formatMoney } from "@/lib/money";
+import { planCadence } from "@/lib/plan-options";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -27,12 +28,19 @@ export default async function PlanPage({
       <Link href="/#plans" className="text-sm font-semibold text-primary">All plans</Link>
       <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-primary">{plan.program}</p>
       <h1 className="font-display text-4xl uppercase">{plan.name}</h1>
-      <p className="mt-2 font-display text-4xl">{formatMoney(plan.priceCents)} <span className="text-lg">per month</span></p>
+      <p className="mt-2 font-display text-4xl" data-plan-cadence={planCadence(plan.billingInterval)}>
+        {formatMoney(plan.priceCents)} <span className="text-lg">{planCadence(plan.billingInterval)}</span>
+      </p>
       <p className="mt-2 text-sm">{plan.sessionsPerMonth} group {plan.program} sessions each billing period. Unused sessions do not roll over.</p>
       {query.canceled ? <p className="mt-3 text-sm font-semibold">Checkout was canceled. You can try again.</p> : null}
       {waiver ? (
         <div className="mt-6">
-          <PlanForm planId={plan.id} priceCents={plan.priceCents} waiver={waiver.body} />
+          <PlanForm
+            planId={plan.id}
+            priceCents={plan.priceCents}
+            waiver={waiver.body}
+            cadence={plan.billingInterval === "YEAR" ? "Yearly" : "Monthly"}
+          />
         </div>
       ) : (
         <p className="mt-6 text-sm">The waiver is not published yet.</p>
