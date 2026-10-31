@@ -93,7 +93,7 @@ function ContinueButton() {
       disabled={pending}
       className="mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-ink px-5 text-base font-semibold text-white disabled:opacity-60"
     >
-      {pending ? "Opening checkout" : "Continue"}
+      {pending ? "Opening checkout" : "Continue to checkout"}
     </button>
   );
 }
@@ -453,6 +453,7 @@ export function PublicSchedule({
 
         {step === 3 ? (
           <div className="mt-4">
+            <p className="mb-3 text-sm text-muted-foreground">Tap an event to book. Tap a day to list that day.</p>
             <CalendarLegend items={legendItems(coachBlocks.filter((block) => block.dayKey.startsWith(month)))} />
             <MonthCalendar
               month={month}
@@ -511,8 +512,8 @@ export function PublicSchedule({
                 <h3 className="font-display text-3xl uppercase">Group schedule</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {scopedTraining
-                    ? "Only the training you chose. Go back to see the others. Tap a day to list it under the calendar. Canceled sessions stay faded."
-                    : "Group sessions on the month. Choose a training and this calendar keeps only that training. Tap a day to list it under the calendar."}
+                    ? "Only the training you chose. Go back to see the others. Tap an event to book. Tap a day to list that day. Canceled sessions stay faded."
+                    : "Tap an event to book. Tap a day to list that day. Choose a training and this calendar keeps only that training."}
                 </p>
                 <div className="mt-3">
                   <CalendarLegend items={legendItems(groupBlocks.filter((block) => block.dayKey.startsWith(groupMonth)))} />

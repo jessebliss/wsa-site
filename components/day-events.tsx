@@ -39,20 +39,22 @@ export function DayEventsPanel({ dayKey, events }: { dayKey: string; events: Cal
                 ) : null}
               </div>
             );
+            const book = event.href?.startsWith("/book/");
             return (
               <li
                 key={event.id}
                 data-day-event={event.id}
                 data-canceled={event.canceled ? "yes" : "no"}
-                className="rounded-xl border border-border border-l-4 p-3"
+                className="overflow-hidden rounded-xl border border-border border-l-4"
                 style={{ borderLeftColor: event.color, opacity: event.canceled ? 0.55 : 1 }}
               >
                 {event.href ? (
-                  <Link href={event.href} className="block">
+                  <Link href={event.href} className="block min-h-11 p-3" data-book={book ? "yes" : undefined}>
                     {body}
+                    <p className="mt-3 text-sm font-semibold text-primary">{book ? "Book" : "Open"}</p>
                   </Link>
                 ) : (
-                  body
+                  <div className="p-3">{body}</div>
                 )}
               </li>
             );

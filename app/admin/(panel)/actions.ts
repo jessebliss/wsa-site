@@ -107,11 +107,11 @@ export async function saveCoachPrices(formData: FormData) {
       update: data,
     });
   } catch (error) {
-    fail("/admin/coaches", error);
+    fail(coachName ? `/admin/coaches/${encodeURIComponent(coachName)}` : "/admin/coaches", error);
   }
   revalidatePath("/");
   revalidatePath("/admin/coaches");
-  redirect("/admin/coaches?saved=1");
+  redirect(`/admin/coaches/${encodeURIComponent(coachName)}?saved=1`);
 }
 
 export type CoachDaySave =
