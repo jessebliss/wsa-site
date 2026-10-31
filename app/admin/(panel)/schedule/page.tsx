@@ -1,5 +1,6 @@
 import { AdminError } from "@/components/admin-error";
 import { AdminMonthSchedule } from "@/components/admin-month-schedule";
+import { DisclosurePanel } from "@/components/disclosure-panel";
 import { SessionForm } from "@/components/session-form";
 import { colorForProgram } from "@/lib/plan-options";
 import { blankSessionValues } from "@/lib/session-defaults";
@@ -44,12 +45,6 @@ export default async function ScheduleAdmin({
         Times are Eastern. A group session starts on every coach until you remove someone. Cancel leaves the event on the calendar. Delete removes it.
       </p>
       <AdminError message={params.error} />
-      <SessionForm
-        roster={roster}
-        minMonth={addMonthsToDay(today, -12).slice(0, 7)}
-        maxMonth={addMonthsToDay(today, 18).slice(0, 7)}
-        values={blankSessionValues(today, roster, PARK)}
-      />
       <AdminMonthSchedule
         todayKey={today}
         minMonth={minMonth}
@@ -73,6 +68,14 @@ export default async function ScheduleAdmin({
           };
         })}
       />
+      <DisclosurePanel label="New session" hideLabel="Hide new session" className="mt-8">
+        <SessionForm
+          roster={roster}
+          minMonth={addMonthsToDay(today, -12).slice(0, 7)}
+          maxMonth={addMonthsToDay(today, 18).slice(0, 7)}
+          values={blankSessionValues(today, roster, PARK)}
+        />
+      </DisclosurePanel>
     </div>
   );
 }

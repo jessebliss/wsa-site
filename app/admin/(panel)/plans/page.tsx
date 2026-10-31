@@ -1,6 +1,7 @@
 import { deletePlan, savePlan } from "@/app/admin/(panel)/actions";
 import { AdminError } from "@/components/admin-error";
-import { ColorSwatches } from "@/components/color-swatches";
+import { ColorSwatches, PlanColor } from "@/components/color-swatches";
+import { DisclosurePanel } from "@/components/disclosure-panel";
 import { ConfirmForm } from "@/components/confirm-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,7 +46,8 @@ export default async function PlansAdmin({
         Monthly or yearly. Yearly bills once a year. A price change applies to new signups. People already on a plan keep their price and included sessions until you change that membership.
       </p>
       <AdminError message={params.error} />
-      <form action={savePlan} className="mt-4 grid gap-3 rounded-2xl bg-white p-4 sm:grid-cols-2">
+      <DisclosurePanel label="Create new" hideLabel="Hide form" className="mt-4">
+      <form action={savePlan} className="grid gap-3 rounded-2xl bg-white p-4 sm:grid-cols-2">
         <div>
           <Label htmlFor="name">Name</Label>
           <Input className="mt-1" id="name" name="name" required />
@@ -71,6 +73,7 @@ export default async function PlansAdmin({
           <Button type="submit">Add plan</Button>
         </div>
       </form>
+      </DisclosurePanel>
       <ul className="mt-6 space-y-4">
         {plans.map((plan) => (
           <li key={plan.id} className="rounded-2xl bg-white p-4">
@@ -86,7 +89,7 @@ export default async function PlansAdmin({
               <Input name="sessionsPerMonth" type="number" min={1} defaultValue={plan.sessionsPerMonth} required aria-label="Sessions included" />
               <Input name="price" defaultValue={centsToDollarInput(plan.priceCents)} required aria-label="Price" />
               <BillingChoice yearly={plan.billingInterval === "YEAR"} />
-              <ColorSwatches value={plan.color} />
+              <PlanColor value={plan.color} />
               <label className="flex items-center gap-2 text-sm font-semibold">
                 <input type="checkbox" name="active" defaultChecked={plan.active} /> Active
               </label>

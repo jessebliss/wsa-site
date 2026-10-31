@@ -1,25 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useFormStatus } from "react-dom";
-import { saveCoachDay } from "@/app/admin/(panel)/actions";
+import { useState, useTransition } from "react";
+import { saveCoachDay, type CoachDaySave } from "@/app/admin/(panel)/actions";
 import { MonthCalendar } from "@/components/month-calendar";
 import { Button } from "@/components/ui/button";
 import { formatHourLabel, hourStartsForDay, type DayOpening } from "@/lib/availability";
-import { etToUtc, formatEt } from "@/lib/time";
+import { dayKeysForMonth, etToUtc, formatEt } from "@/lib/time";
 
-function SaveDayButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" className="w-full sm:w-auto" disabled={pending}>
-      {pending ? "Saving" : "Save this day"}
-    </Button>
-  );
-}
-
-function DayEditor({ day, saved }: { day: string; saved?: DayOpening }) {
+function DayEditor({
+  day,
+  saved,
+  onSaved,
+}: {
+  day: string;
+  saved?: DayOpening;
+  onSaved: (result: Extract<CoachDaySave, { ok: true }>) => void;
+}) {
   const [unavailable, setUnavailable] = useState(Boolean(saved?.unavailable));
   const [hours, setHours] = useState<number[]>(saved && !saved.unavailable ? saved.hours : []);
+  const [error, setError] = useState("");
+  const [pending, startTransition] = useTransition();
   const choices = hourStartsForDay(day);
   const label = formatEt(etToUtc(day, "12:00"), { weekday: "long", month: "long", day: "numeric" });
 
@@ -28,8 +28,26 @@ function DayEditor({ day, saved }: { day: string; saved?: DayOpening }) {
     setHours((current) => (current.includes(hour) ? current.filter((item) => item !== hour) : [...current, hour].sort((a, b) => a - b)));
   }
 
+  function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    setError("");
+    startTransition(async () => {
+      try {
+        const result = await saveCoachDay(data);
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        onSaved(result);
+      } catch {
+        setError("Something went wrong.");
+      }
+    });
+  }
+
   return (
-    <form action={saveCoachDay} className="mt-4 rounded-2xl bg-white p-4">
+    <form onSubmit={onSubmit} className="mt-4 rounded-2xl bg-white p-4" data-day-editor={day}>
       <input type="hidden" name="dayKey" value={day} />
       <input type="hidden" name="unavailable" value={unavailable ? "yes" : "no"} />
       {unavailable ? null : hours.map((hour) => <input key={hour} type="hidden" name="hours" value={hour} />)}
@@ -67,8 +85,11 @@ function DayEditor({ day, saved }: { day: string; saved?: DayOpening }) {
       >
         Not available
       </button>
+      {error ? <p className="mt-3 text-sm font-semibold text-primary">{error}</p> : null}
       <div className="mt-4">
-        <SaveDayButton />
+        <Button type="submit" className="w-full sm:w-auto" disabled={pending}>
+          {pending ? "Saving" : "Save this day"}
+        </Button>
       </div>
     </form>
   );
@@ -81,7 +102,6 @@ export function CoachAvailability({
   todayKey,
   initialDay,
   days,
-  savedNotice,
 }: {
   month: string;
   minMonth: string;
@@ -89,23 +109,26 @@ export function CoachAvailability({
   todayKey: string;
   initialDay: string;
   days: Record<string, DayOpening>;
-  savedNotice: boolean;
 }) {
   const [currentMonth, setCurrentMonth] = useState(month);
   const [day, setDay] = useState(initialDay);
+  const [savedDays, setSavedDays] = useState(days);
+  const [notice, setNotice] = useState("");
 
-  useEffect(() => {
-    setCurrentMonth(month);
-    setDay(initialDay);
-  }, [month, initialDay]);
-
-  const marked = Object.entries(days)
+  const marked = Object.entries(savedDays)
     .filter(([, value]) => !value.unavailable && value.hours.length > 0)
     .map(([key]) => key);
 
+  function showMonth(next: string) {
+    setCurrentMonth(next);
+    setNotice("");
+    const keys = dayKeysForMonth(next);
+    setDay(keys.find((key) => key >= todayKey) ?? keys[0] ?? "");
+  }
+
   return (
-    <div>
-      {savedNotice ? <p className="mb-3 text-sm font-semibold text-primary">Saved this day.</p> : null}
+    <div data-availability-month={currentMonth}>
+      {notice ? <p className="mb-3 text-sm font-semibold text-primary">{notice}</p> : null}
       <MonthCalendar
         month={currentMonth}
         minMonth={minMonth}
@@ -113,13 +136,26 @@ export function CoachAvailability({
         todayKey={todayKey}
         selected={day}
         marked={marked}
-        onSelect={setDay}
-        onMonth={(next) => {
-          const params = new URLSearchParams({ month: next });
-          window.location.assign(`/admin/availability?${params.toString()}`);
+        onSelect={(next) => {
+          setDay(next);
+          setNotice("");
         }}
+        onMonth={showMonth}
       />
-      {day ? <DayEditor key={`${day}:${savedNotice ? "saved" : "edit"}`} day={day} saved={days[day]} /> : null}
+      {day ? (
+        <DayEditor
+          key={day}
+          day={day}
+          saved={savedDays[day]}
+          onSaved={(result) => {
+            setSavedDays((current) => ({
+              ...current,
+              [result.dayKey]: { unavailable: result.unavailable, hours: result.hours },
+            }));
+            setNotice("Saved this day.");
+          }}
+        />
+      ) : null}
     </div>
   );
 }

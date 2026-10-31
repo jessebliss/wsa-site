@@ -21,6 +21,8 @@ export type CalendarBlock = {
   colorId: string;
   canceled: boolean;
   href?: string;
+  /** Extra booking line, such as price and spots. Omit when the row already says enough. */
+  note?: string;
 };
 
 function blockStyle(color: string, canceled: boolean): CSSProperties {
@@ -92,7 +94,7 @@ export function MonthCalendar({
           disabled={atStart}
           aria-label="Previous month"
         >
-          Back
+          Previous
         </button>
         <p className="font-display text-2xl uppercase">{formatMonthLabel(month)}</p>
         <button
@@ -140,7 +142,7 @@ export function MonthCalendar({
                 onClick={() => {
                   if (canSelect) onSelect(key);
                 }}
-                className={`flex min-h-20 flex-col rounded-lg p-0.5 sm:min-h-24 ${
+                className={`flex min-h-24 flex-col rounded-lg p-0.5 sm:min-h-28 ${
                   isSelected ? "ring-2 ring-ink" : past ? "text-muted-foreground/50" : open && onlyOpen ? "bg-primary/10" : "bg-muted/40"
                 }`}
               >
@@ -153,19 +155,15 @@ export function MonthCalendar({
                     event.stopPropagation();
                     if (canSelect) onSelect(key);
                   }}
-                  className="px-0.5 text-left text-[11px] font-semibold disabled:cursor-default"
+                  className="min-h-6 px-0.5 text-left text-sm font-semibold disabled:cursor-default"
                 >
                   {Number(key.slice(-2))}
                 </button>
-                <div className="mt-0.5 flex flex-col gap-0.5" onClick={(event) => event.stopPropagation()}>
+                <div className="mt-0.5 flex flex-col gap-1" onClick={(event) => event.stopPropagation()}>
                   {dayEvents.map((event) => {
-                    const className = "block rounded-sm px-1 py-0.5 text-left text-[10px] font-semibold leading-tight";
-                    const text = (
-                      <>
-                        <span className="block truncate">{event.time}</span>
-                        <span className="block truncate">{event.title}</span>
-                      </>
-                    );
+                    const className = "block min-h-11 rounded-md px-1 py-1 text-left text-xs font-semibold leading-tight";
+                    const text = <span className="block whitespace-normal">{event.time}</span>;
+                    const label = `${event.time}. ${event.title}`;
                     if (event.href) {
                       return (
                         <Link
@@ -174,6 +172,8 @@ export function MonthCalendar({
                           data-event={event.id}
                           data-color={event.colorId}
                           data-canceled={event.canceled ? "yes" : "no"}
+                          aria-label={label}
+                          title={event.title}
                           className={className}
                           style={blockStyle(event.color, event.canceled)}
                         >
@@ -187,6 +187,7 @@ export function MonthCalendar({
                         data-event={event.id}
                         data-color={event.colorId}
                         data-canceled={event.canceled ? "yes" : "no"}
+                        title={event.title}
                         className={className}
                         style={blockStyle(event.color, event.canceled)}
                       >

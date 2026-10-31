@@ -2,6 +2,7 @@ import { createCoach, deleteCoach, saveCoachPrices } from "@/app/admin/(panel)/a
 import { AdminError } from "@/components/admin-error";
 import { CoachQrCard } from "@/components/coach-qr";
 import { ConfirmForm } from "@/components/confirm-form";
+import { SectionSwitch } from "@/components/section-switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -79,7 +80,14 @@ export default async function CoachesPage({
       </p>
       <AdminError message={params.error} />
       {params.saved ? <p className="mt-3 text-sm font-semibold text-primary">Saved. Parents see the new price.</p> : null}
-      <h2 className="mt-8 font-display text-3xl uppercase">Public prices</h2>
+      <SectionSwitch
+        sections={[
+          {
+            id: "prices",
+            label: "Prices",
+            body: (
+              <>
+      <h2 className="font-display text-3xl uppercase">Public prices</h2>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
         Private quarterback is the one-hour price on that coach&apos;s booking page. Speed shows only when the coach is on speed sessions. Saving replaces what parents see.
       </p>
@@ -133,6 +141,18 @@ export default async function CoachesPage({
           );
         })}
       </div>
+              </>
+            ),
+          },
+          {
+            id: "logins",
+            label: "Logins",
+            body: (
+              <>
+      <h2 className="font-display text-3xl uppercase">Logins</h2>
+      <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+        Create a login for a coach already on the schedule.
+      </p>
       <form action={createCoach} className="mt-4 grid gap-3 rounded-2xl bg-white p-4 sm:grid-cols-2">
         <div>
           <Label htmlFor="name">Name</Label>
@@ -159,7 +179,25 @@ export default async function CoachesPage({
           <Button type="submit">Create coach login</Button>
         </div>
       </form>
-      <h2 className="mt-8 font-display text-3xl uppercase">QR codes</h2>
+      <ul className="mt-6 space-y-2">
+        {coaches.length === 0 ? <li className="text-sm text-muted-foreground">No coach logins yet.</li> : null}
+        {coaches.map((coach) => (
+          <li key={coach.id} className="rounded-xl bg-white p-4">
+            <p className="font-semibold">{coach.name}</p>
+            <p className="text-sm text-muted-foreground">{coach.email}</p>
+            <p className="text-sm">Parents see {coach.coachName}</p>
+          </li>
+        ))}
+      </ul>
+              </>
+            ),
+          },
+          {
+            id: "codes",
+            label: "QR codes",
+            body: (
+              <>
+      <h2 className="font-display text-3xl uppercase">QR codes</h2>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
         Each code opens Quarterback Training with that coach already selected. The parent picks a day and a time, then checks out. A coach with a login also sees their code there.
       </p>
@@ -168,7 +206,19 @@ export default async function CoachesPage({
           <CoachQrCard key={name} coach={name} origin={origin} />
         ))}
       </div>
-      <ul className="mt-6 space-y-2">
+              </>
+            ),
+          },
+          {
+            id: "delete",
+            label: "Delete",
+            body: (
+              <>
+      <h2 className="font-display text-3xl uppercase">Delete</h2>
+      <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+        This removes the login, the booking code, and saved hours. An upcoming booking that names only this coach is refused.
+      </p>
+      <ul className="mt-4 space-y-2">
         {coaches.length === 0 ? <li className="text-sm text-muted-foreground">No coach logins yet.</li> : null}
         {coaches.map((coach) => (
           <li key={coach.id} className="rounded-xl bg-white p-4">
@@ -186,6 +236,11 @@ export default async function CoachesPage({
           </li>
         ))}
       </ul>
+              </>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }

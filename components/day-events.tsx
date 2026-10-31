@@ -32,6 +32,11 @@ export function DayEventsPanel({ dayKey, events }: { dayKey: string; events: Cal
                 <p className="text-sm text-muted-foreground" data-event-location>
                   {event.location}
                 </p>
+                {event.note ? (
+                  <p className="mt-2 text-sm font-semibold" data-event-note>
+                    {event.note}
+                  </p>
+                ) : null}
               </div>
             );
             return (

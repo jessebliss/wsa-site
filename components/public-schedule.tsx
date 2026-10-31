@@ -7,7 +7,6 @@ import { bookPrivateQuarterbackHour } from "@/app/(public)/private-lesson";
 import { CalendarLegend, legendItems } from "@/components/calendar-legend";
 import { DayEventsPanel } from "@/components/day-events";
 import { MonthCalendar, type CalendarBlock } from "@/components/month-calendar";
-import { Badge } from "@/components/ui/badge";
 import { type OpeningsByCoach } from "@/lib/availability";
 import { INTRO_KEY, INTRO_LABEL, INTRO_NOTE, INTRO_PRICE_CENTS, isIntro } from "@/lib/intro";
 import { formatMoney } from "@/lib/money";
@@ -22,7 +21,7 @@ import {
   type PrivateHourSession,
 } from "@/lib/private-quarterback";
 import { colorForProgram, type PlanColorSource } from "@/lib/plan-options";
-import { offeringKey, offeringLabel, offeringRank, openSessions, sessionCoachNames, sessionsOnDay } from "@/lib/schedule-filter";
+import { offeringKey, offeringLabel, offeringRank, openSessions, sessionCoachNames } from "@/lib/schedule-filter";
 import { dayKeysForMonth, etDayKey, etToUtc, formatEt, formatEtTime } from "@/lib/time";
 
 export type ScheduleSession = {
@@ -86,43 +85,72 @@ export type PrivateCoachChoice = {
   priceCents: number;
 };
 
-function HourButton({ slot, priceCents }: { slot: OpenPrivateHour; priceCents: number }) {
+function ContinueButton() {
   const { pending } = useFormStatus();
-  const start = new Date(slot.startsAt);
-  const end = new Date(slot.endsAt);
   return (
     <button
       type="submit"
-      data-hour={slot.hour}
       disabled={pending}
-      className="block w-full rounded-2xl border border-border bg-white p-4 text-left shadow-sm disabled:opacity-60"
+      className="mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-ink px-5 text-base font-semibold text-white disabled:opacity-60"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <Badge>Private</Badge>
-          <h4 className="mt-2 font-display text-2xl uppercase leading-none">Quarterback Training</h4>
-        </div>
-        <p className="text-right font-display text-2xl">{formatMoney(priceCents)}</p>
-      </div>
-      <p className="mt-3 text-sm">
-        {pending ? "Opening checkout" : `${formatEtTime(start)}–${formatEtTime(end)} ET`}
-      </p>
+      {pending ? "Opening checkout" : "Continue"}
     </button>
   );
 }
 
-function CanceledCard({ session }: { session: ScheduleSession }) {
-  const names = sessionCoachNames(session);
+function PrivateHourForm({
+  coach,
+  day,
+  slots,
+  prices,
+  showDate,
+}: {
+  coach: string;
+  day: string;
+  slots: OpenPrivateHour[];
+  prices: number[];
+  showDate: boolean;
+}) {
+  const [selected, setSelected] = useState<number | null>(null);
+  const same = prices.length > 0 && prices.every((price) => price === prices[0]);
+  const heading = showDate
+    ? formatEt(etToUtc(day, "12:00"), { weekday: "long", month: "long", day: "numeric" })
+    : "Open times";
+
   return (
-    <div className="rounded-2xl border border-border bg-white p-4" data-canceled={session.id}>
-      <Badge>Canceled</Badge>
-      <h4 className="mt-2 font-display text-2xl uppercase leading-none line-through">{session.title}</h4>
-      <p className="mt-3 text-sm">
-        {formatEtTime(new Date(session.startsAt))}–{formatEtTime(new Date(session.endsAt))} ET
-        {names.length > 0 ? ` · ${names.join(", ")}` : ""}
-      </p>
-      <p className="mt-1 text-sm text-muted-foreground">Canceled. This time can hold another event.</p>
-    </div>
+    <form action={bookPrivateQuarterbackHour} className="mt-4 rounded-2xl bg-white p-4" data-times="hours">
+      <input type="hidden" name="coach" value={coach} />
+      <input type="hidden" name="day" value={day} />
+      <h3 className="font-display text-2xl uppercase">{heading}</h3>
+      {same ? <p className="mt-1 text-sm font-semibold">{formatMoney(prices[0])}</p> : null}
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {slots.map((slot, index) => {
+          const start = new Date(slot.startsAt);
+          const end = new Date(slot.endsAt);
+          const on = selected === slot.hour;
+          return (
+            <label
+              key={slot.hour}
+              className={`flex min-h-11 cursor-pointer flex-col items-center justify-center rounded-xl px-2 text-center text-sm font-semibold ${on ? "bg-primary text-white" : "bg-muted"}`}
+            >
+              <input
+                type="radio"
+                name="hour"
+                value={slot.hour}
+                data-hour={slot.hour}
+                required
+                checked={on}
+                onChange={() => setSelected(slot.hour)}
+                className="sr-only"
+              />
+              {formatEtTime(start)}–{formatEtTime(end)}
+              {same ? null : <span className="mt-0.5 text-xs font-semibold">{formatMoney(prices[index] ?? 0)}</span>}
+            </label>
+          );
+        })}
+      </div>
+      <ContinueButton />
+    </form>
   );
 }
 
@@ -235,10 +263,6 @@ export function PublicSchedule({
     }
     return tally;
   }, [usesAvailability, coach, openings, sessions, now, chosen, canceledChosen, monthDays, todayKey]);
-  const canceledToday = sessionsOnDay(canceledChosen, day);
-  const daySessions = sessionsOnDay(chosen, day).sort(
-    (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
-  );
   const dayHours = useMemo(() => {
     if (!usesAvailability || !day) return [];
     return openPrivateHours({
@@ -267,6 +291,7 @@ export function PublicSchedule({
       setMonth(currentMonth);
     }
     setCoach(name);
+    setShowGroups(false);
     setStep(3);
   }
 
@@ -301,70 +326,41 @@ export function PublicSchedule({
         if (offeringId && offeringKey(session) !== offeringId) return false;
         return sessionCoachNames(session).includes(coach);
       })
-      .map((session) => sessionBlock(session, plans));
-  }, [sessions, coach, offeringId, plans]);
-
-  function shownPrice(session: ScheduleSession) {
-    if (session.program === SPEED_PROGRAM && speedPrices[coach] != null) return speedPrices[coach];
-    if (isPrivateQuarterback(session) && savedPrivatePrices[coach] != null) return savedPrivatePrices[coach];
-    return session.priceCents;
-  }
+      .map((session) => {
+        const block = sessionBlock(session, plans);
+        if (session.status === "CANCELED") return block;
+        const price =
+          session.program === SPEED_PROGRAM && speedPrices[coach] != null
+            ? speedPrices[coach]
+            : isPrivateQuarterback(session) && savedPrivatePrices[coach] != null
+              ? savedPrivatePrices[coach]
+              : session.priceCents;
+        const spots = session.spotsLeft;
+        return {
+          ...block,
+          note: `${formatMoney(price)} · ${spots} spot${spots === 1 ? "" : "s"} left`,
+        };
+      });
+  }, [sessions, coach, offeringId, plans, speedPrices, savedPrivatePrices]);
+  const openHourIds = new Set(dayHours.flatMap((slot) => (slot.sessionId ? [slot.sessionId] : [])));
+  const dayExtras = coachBlocks.filter((event) => event.dayKey === day && !openHourIds.has(event.id));
 
   return (
     <>
       <section id="schedule" className="mt-6 scroll-mt-24" data-step={step}>
-        <button
-          type="button"
-          aria-expanded={showGroups}
-          onClick={() => setShowGroups((open) => !open)}
-          className="inline-flex min-h-12 items-center rounded-full bg-primary px-5 text-sm font-semibold text-white"
-        >
-          {showGroups ? "Hide group schedule" : "Group schedule"}
-        </button>
-        <div className="mt-4 flex items-center justify-between gap-3">
-          {step > 1 ? (
-            <button
-              type="button"
-              onClick={back}
-              className="inline-flex min-h-12 items-center rounded-full bg-ink px-5 text-base font-semibold text-white"
-            >
-              Back
-            </button>
-          ) : (
-            <span />
-          )}
+        <div className="flex items-end justify-between gap-3">
+          <h2 className="font-display text-4xl uppercase leading-none">{question}</h2>
           <p className="text-sm text-muted-foreground">{step} of 3</p>
         </div>
-        {showGroups ? (
-          <div className="mt-4" data-group-schedule="open">
-            <h2 className="font-display text-3xl uppercase">Group schedule</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {scopedTraining
-                ? "Only the training you chose. Go back to see the others. Tap a day to list it under the calendar. Canceled sessions stay faded."
-                : "Group sessions on the month. Choose a training and this calendar keeps only that training. Tap a day to list it under the calendar."}
-            </p>
-            <div className="mt-3">
-              <CalendarLegend items={legendItems(groupBlocks.filter((block) => block.dayKey.startsWith(groupMonth)))} />
-              <MonthCalendar
-                month={groupMonth}
-                minMonth={currentMonth}
-                maxMonth={maxMonth}
-                todayKey={todayKey}
-                selected={groupDay}
-                marked={[]}
-                events={groupBlocks}
-                onSelect={setGroupDay}
-                onMonth={(next) => {
-                  setGroupMonth(next);
-                  setGroupDay("");
-                }}
-              />
-              {groupBlocks.every((block) => !block.dayKey.startsWith(groupMonth)) ? (
-                <p className="mt-3 text-sm text-muted-foreground">No group sessions this month.</p>
-              ) : null}
-              <DayEventsPanel dayKey={groupDay} events={groupBlocks} />
-            </div>
-          </div>
+        {trail ? <p className="mt-2 text-sm text-muted-foreground">{trail}</p> : null}
+        {step > 1 ? (
+          <button
+            type="button"
+            onClick={back}
+            className="mt-3 inline-flex min-h-12 items-center rounded-full bg-ink px-5 text-base font-semibold text-white"
+          >
+            Back
+          </button>
         ) : null}
         {step === 3 && coach ? (
           <div data-selected-coach={coach} className="mt-4 flex items-center gap-4 rounded-2xl border-2 border-primary bg-white p-4">
@@ -382,8 +378,6 @@ export function PublicSchedule({
             </div>
           </div>
         ) : null}
-        <h2 className="mt-4 font-display text-4xl uppercase leading-none">{question}</h2>
-        {trail ? <p className="mt-2 text-sm text-muted-foreground">{trail}</p> : null}
         {step === 1 ? (
           offerings.length === 0 ? (
             <p className="mt-4 rounded-2xl bg-white p-5 text-sm text-muted-foreground">
@@ -479,72 +473,69 @@ export function PublicSchedule({
             {Object.keys(counts).length === 0 && coachBlocks.every((block) => !block.dayKey.startsWith(month)) ? (
               <p className="mt-4 text-sm text-muted-foreground">No open days this month.</p>
             ) : null}
-            <DayEventsPanel dayKey={day} events={coachBlocks} />
             {day && usesAvailability ? (
               <>
-                <h3 className="mt-4 font-display text-2xl uppercase">
-                  {formatEt(etToUtc(day, "12:00"), { weekday: "long", month: "long", day: "numeric" })}
-                </h3>
-                <div className="mt-3 space-y-3" data-times="hours">
-                  {dayHours.map((slot) => {
-                    const existing = sessions.find((session) => session.id === slot.sessionId);
-                    const priceCents = savedPrivatePrices[coach] ?? existing?.priceCents ?? privatePrice;
-                    return (
-                      <form key={slot.hour} action={bookPrivateQuarterbackHour}>
-                        <input type="hidden" name="coach" value={coach} />
-                        <input type="hidden" name="day" value={day} />
-                        <input type="hidden" name="hour" value={slot.hour} />
-                        <HourButton slot={slot} priceCents={priceCents} />
-                      </form>
-                    );
-                  })}
-                </div>
-                {canceledToday.length > 0 ? (
-                  <div className="mt-3 space-y-3">
-                    {canceledToday.map((session) => (
-                      <CanceledCard key={session.id} session={session} />
-                    ))}
-                  </div>
+                {dayExtras.length > 0 ? <DayEventsPanel dayKey={day} events={dayExtras} /> : null}
+                {dayHours.length > 0 ? (
+                  <PrivateHourForm
+                    coach={coach}
+                    day={day}
+                    slots={dayHours}
+                    showDate={dayExtras.length === 0}
+                    prices={dayHours.map((slot) => {
+                      const existing = sessions.find((session) => session.id === slot.sessionId);
+                      return savedPrivatePrices[coach] ?? existing?.priceCents ?? privatePrice;
+                    })}
+                  />
+                ) : dayExtras.length === 0 ? (
+                  <p className="mt-4 text-sm text-muted-foreground">No open times this day.</p>
                 ) : null}
               </>
-            ) : null}
-            {day && !usesAvailability ? (
-              <>
-                <h3 className="mt-4 font-display text-2xl uppercase">
-                  {formatEt(etToUtc(day, "12:00"), { weekday: "long", month: "long", day: "numeric" })}
-                </h3>
-                <div className="mt-3 space-y-3">
-                  {daySessions.map((session) => (
-                    <Link
-                      key={session.id}
-                      href={`/book/${session.id}`}
-                      className="block rounded-2xl border border-border bg-white p-4 shadow-sm active:scale-[0.99]"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <Badge>{session.kind === "GROUP" ? "Group" : session.kind === "CAMP" ? "Camp" : "Private"}</Badge>
-                          <h4 className="mt-2 font-display text-2xl uppercase leading-none">{session.title}</h4>
-                        </div>
-                        <p className="text-right font-display text-2xl">{formatMoney(shownPrice(session))}</p>
-                      </div>
-                      <div className="mt-3 flex items-end justify-between gap-3 text-sm">
-                        <p>
-                          {formatEtTime(new Date(session.startsAt))}–{formatEtTime(new Date(session.endsAt))} ET
-                        </p>
-                        <p className="font-semibold">
-                          {session.spotsLeft} spot{session.spotsLeft === 1 ? "" : "s"} left
-                        </p>
-                      </div>
-                      {session.kind === "GROUP" ? (
-                        <p className="mt-2 text-sm text-muted-foreground">{sessionCoachNames(session).join(", ")}</p>
-                      ) : null}
-                    </Link>
-                  ))}
-                  {canceledToday.map((session) => (
-                    <CanceledCard key={session.id} session={session} />
-                  ))}
+            ) : (
+              <DayEventsPanel dayKey={day} events={coachBlocks} />
+            )}
+          </div>
+        ) : null}
+        {step < 3 ? (
+          <div className="mt-6">
+            <button
+              type="button"
+              aria-expanded={showGroups}
+              onClick={() => setShowGroups((open) => !open)}
+              className="inline-flex min-h-11 items-center text-sm font-semibold text-primary"
+            >
+              {showGroups ? "Hide group schedule" : "Group schedule"}
+            </button>
+            {showGroups ? (
+              <div className="mt-4" data-group-schedule="open">
+                <h3 className="font-display text-3xl uppercase">Group schedule</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {scopedTraining
+                    ? "Only the training you chose. Go back to see the others. Tap a day to list it under the calendar. Canceled sessions stay faded."
+                    : "Group sessions on the month. Choose a training and this calendar keeps only that training. Tap a day to list it under the calendar."}
+                </p>
+                <div className="mt-3">
+                  <CalendarLegend items={legendItems(groupBlocks.filter((block) => block.dayKey.startsWith(groupMonth)))} />
+                  <MonthCalendar
+                    month={groupMonth}
+                    minMonth={currentMonth}
+                    maxMonth={maxMonth}
+                    todayKey={todayKey}
+                    selected={groupDay}
+                    marked={[]}
+                    events={groupBlocks}
+                    onSelect={setGroupDay}
+                    onMonth={(next) => {
+                      setGroupMonth(next);
+                      setGroupDay("");
+                    }}
+                  />
+                  {groupBlocks.every((block) => !block.dayKey.startsWith(groupMonth)) ? (
+                    <p className="mt-3 text-sm text-muted-foreground">No group sessions this month.</p>
+                  ) : null}
+                  <DayEventsPanel dayKey={groupDay} events={groupBlocks} />
                 </div>
-              </>
+              </div>
             ) : null}
           </div>
         ) : null}

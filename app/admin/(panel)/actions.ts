@@ -114,11 +114,14 @@ export async function saveCoachPrices(formData: FormData) {
   redirect("/admin/coaches?saved=1");
 }
 
-export async function saveCoachDay(formData: FormData) {
+export type CoachDaySave =
+  | { ok: true; dayKey: string; unavailable: boolean; hours: number[] }
+  | { ok: false; error: string };
+
+export async function saveCoachDay(formData: FormData): Promise<CoachDaySave> {
   const staffUserId = await requireCoach();
   const dayKey = String(formData.get("dayKey") ?? "");
   const month = dayKey.slice(0, 7);
-  const back = `/admin/availability?month=${month}&day=${dayKey}`;
   try {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) throw new Error("Choose a day on the calendar.");
     const todayKey = etDayKey(new Date());
@@ -139,22 +142,24 @@ export async function saveCoachDay(formData: FormData) {
     if (!unavailable && hours.length === 0) {
       throw new Error("Choose at least one hour, or mark the day not available.");
     }
+    const savedHours = unavailable ? [] : hours;
     await prisma.coachDay.upsert({
       where: { staffUserId_dayKey: { staffUserId, dayKey } },
       create: {
         staffUserId,
         dayKey,
         unavailable,
-        hours: unavailable ? [] : hours,
+        hours: savedHours,
       },
-      update: { unavailable, hours: unavailable ? [] : hours },
+      update: { unavailable, hours: savedHours },
     });
+    revalidatePath("/");
+    revalidatePath("/admin/availability");
+    return { ok: true, dayKey, unavailable, hours: savedHours };
   } catch (error) {
-    fail(back, error);
+    const message = error instanceof Error ? error.message : "Something went wrong.";
+    return { ok: false, error: message };
   }
-  revalidatePath("/");
-  revalidatePath("/admin/availability");
-  redirect(`${back}&saved=1`);
 }
 
 function readScope(formData: FormData): EventScope {

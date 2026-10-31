@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { logout } from "@/app/admin/(panel)/actions";
+import { AdminNav } from "@/components/admin-nav";
 import { auth } from "@/lib/auth";
 
-const adminLinks = [
+const adminLinks: [string, string][] = [
   ["Overview", "/admin"],
   ["Schedule", "/admin/schedule"],
   ["Plans", "/admin/plans"],
@@ -18,7 +18,7 @@ const adminLinks = [
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   const coach = session?.user?.role === "coach";
-  const links = coach ? [["Availability", "/admin/availability"]] : adminLinks;
+  const links: [string, string][] = coach ? [["Availability", "/admin/availability"]] : adminLinks;
 
   return (
     <div className="min-h-screen">
@@ -29,13 +29,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <button className="text-sm font-semibold" type="submit">Log out</button>
           </form>
         </div>
-        <nav className="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-4 pb-3" aria-label="Admin">
-          {links.map(([label, href]) => (
-            <Link key={href} href={href} className="shrink-0 rounded-full bg-white/10 px-3 py-2 text-sm font-semibold">
-              {label}
-            </Link>
-          ))}
-        </nav>
+        <AdminNav links={links} />
       </div>
       <div className="mx-auto max-w-6xl px-4 py-6">{children}</div>
     </div>

@@ -1,4 +1,7 @@
-import { EVENT_COLORS } from "@/lib/plan-options";
+"use client";
+
+import { useState } from "react";
+import { EVENT_COLORS, eventColor } from "@/lib/plan-options";
 
 export function ColorSwatches({ value }: { value: string }) {
   return (
@@ -26,4 +29,25 @@ export function ColorSwatches({ value }: { value: string }) {
       </div>
     </fieldset>
   );
+}
+
+export function PlanColor({ value }: { value: string }) {
+  const [open, setOpen] = useState(false);
+  const current = eventColor(value);
+  if (!open) {
+    return (
+      <div className="sm:col-span-2">
+        <p className="text-sm font-semibold">Color</p>
+        <div className="mt-2 flex items-center gap-3">
+          <span className="h-11 w-11 rounded-md" style={{ backgroundColor: current.hex }} data-chosen-color={current.id} />
+          <span className="text-sm">{current.label}</span>
+          <button type="button" className="text-sm font-semibold text-primary" onClick={() => setOpen(true)}>
+            Change
+          </button>
+        </div>
+        <input type="hidden" name="color" value={current.id} />
+      </div>
+    );
+  }
+  return <ColorSwatches value={value} />;
 }

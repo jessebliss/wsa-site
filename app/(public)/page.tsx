@@ -9,6 +9,7 @@ import { SPEED_PROGRAM, isPrivateQuarterback, matchCoachName } from "@/lib/priva
 import { loadPrivateQuarterbackPrices, loadSavedPrivatePrices, loadSavedSpeedPrices, privateQuarterbackCoachNames } from "@/lib/private-quarterback-data";
 import { sessionCoachNames } from "@/lib/schedule-filter";
 import { etDayKey, etToUtc, shiftMonth } from "@/lib/time";
+import { PlanDisclosure } from "@/components/plan-disclosure";
 import { PublicSchedule } from "@/components/public-schedule";
 import { extendSeriesHorizon } from "@/lib/series";
 
@@ -76,7 +77,7 @@ export default async function SchedulePage({
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Book a session</p>
       <h1 className="font-display text-5xl uppercase">Schedule</h1>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-        Times are Eastern. Pick what you want, who you want, then a day. Group sessions can use a monthly plan. Camps and private lessons are paid once.
+        Times are Eastern. Choose a training, then a coach and a day.
       </p>
 
       <PublicSchedule
@@ -114,9 +115,8 @@ export default async function SchedulePage({
           location: session.location,
         }))}
       >
-        <section id="plans" className="mt-12 scroll-mt-24">
-          <h2 className="font-display text-4xl uppercase">Plans</h2>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+        <PlanDisclosure>
+          <p className="max-w-2xl text-sm text-muted-foreground">
             Each plan is a number of group sessions in that program, billed monthly or once a year. Unused sessions do not roll over. Camps and private lessons are not included.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -135,7 +135,7 @@ export default async function SchedulePage({
               ))
             )}
           </div>
-        </section>
+        </PlanDisclosure>
       </PublicSchedule>
     </div>
   );
