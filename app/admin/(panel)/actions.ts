@@ -279,9 +279,13 @@ export async function savePlan(formData: FormData) {
     if (!isEventColorId(color)) throw new Error("Choose a color.");
     if (billingValue !== "MONTH" && billingValue !== "YEAR") throw new Error("Choose monthly or yearly.");
     const billingInterval: BillingInterval = billingValue === "YEAR" ? "YEAR" : "MONTH";
+    const typeId = String(formData.get("typeId") ?? "").trim();
+    const type = typeId ? await prisma.trainingType.findUnique({ where: { id: typeId } }) : null;
+    if (!type) throw new Error("Choose a type.");
     const data = {
       name: String(formData.get("name") ?? "").trim(),
-      program: String(formData.get("program") ?? "").trim(),
+      program: type.colorProgram || type.name,
+      typeId: type.id,
       sessionsPerMonth: Number(formData.get("sessionsPerMonth")),
       priceCents: dollarsToCents(String(formData.get("price") ?? "")),
       billingInterval,
@@ -289,7 +293,7 @@ export async function savePlan(formData: FormData) {
       active: formData.get("active") === "on",
       sortOrder: Number(formData.get("sortOrder") ?? 0) || 0,
     };
-    if (!data.name || !data.program) throw new Error("Name and program are required.");
+    if (!data.name) throw new Error("Name is required.");
     if (!Number.isInteger(data.sessionsPerMonth) || data.sessionsPerMonth < 1) {
       throw new Error("Times included has to be at least 1.");
     }
@@ -410,11 +414,12 @@ export async function deleteTrainingType(formData: FormData) {
     const id = String(formData.get("id") ?? "");
     const type = await prisma.trainingType.findUnique({ where: { id } });
     if (!type) throw new Error("That type is already gone.");
-    const [sessions, series] = await Promise.all([
+    const [sessions, series, memberships] = await Promise.all([
       prisma.trainingSession.count({ where: { typeId: id } }),
       prisma.eventSeries.count({ where: { typeId: id } }),
+      prisma.plan.count({ where: { typeId: id } }),
     ]);
-    if (sessions + series > 0) {
+    if (sessions + series + memberships > 0) {
       throw new Error("This type still has sessions. Remove was refused.");
     }
     await prisma.trainingType.delete({ where: { id } });

@@ -70,6 +70,8 @@ model Plan {
   seedKey          String?        @unique
   name             String
   program          String
+  typeId           String?
+  type             TrainingType?  @relation(fields: [typeId], references: [id], onDelete: Restrict)
   sessionsPerMonth Int
   priceCents       Int
   billingInterval  BillingInterval @default(MONTH)
@@ -334,6 +336,7 @@ model TrainingType {
   updatedAt    DateTime          @updatedAt
   sessions     TrainingSession[]
   series       EventSeries[]
+  plans        Plan[]
 
   @@map("training_types")
 }

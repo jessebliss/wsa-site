@@ -9,6 +9,35 @@ import { Label } from "@/components/ui/label";
 import { centsToDollarInput, formatMoney } from "@/lib/money";
 import { eventColor, planCadence } from "@/lib/plan-options";
 import { prisma } from "@/lib/prisma";
+import { ensureTrainingTypes, loadTrainingTypes } from "@/lib/training-types";
+
+function TypeChoice({
+  id,
+  types,
+  value,
+}: {
+  id: string;
+  types: { id: string; name: string }[];
+  value?: string;
+}) {
+  return (
+    <div>
+      <Label htmlFor={id}>Type</Label>
+      <select
+        id={id}
+        name="typeId"
+        required
+        defaultValue={value ?? ""}
+        className="mt-1 h-11 w-full rounded-md border border-border bg-white px-3"
+      >
+        <option value="">Choose</option>
+        {types.map((type) => (
+          <option key={type.id} value={type.id}>{type.name}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
 
 function BillingChoice({ yearly }: { yearly: boolean }) {
   return (
@@ -38,7 +67,16 @@ export default async function SessionsAdmin({
   searchParams: Promise<{ error?: string }>;
 }) {
   const params = await searchParams;
+  await ensureTrainingTypes();
+  const types = await loadTrainingTypes();
   const plans = await prisma.plan.findMany({ orderBy: { sortOrder: "asc" } });
+  for (const plan of plans) {
+    if (plan.typeId) continue;
+    const match = types.find((type) => type.name === plan.program) ?? types.find((type) => type.colorProgram === plan.program);
+    if (!match) continue;
+    await prisma.plan.update({ where: { id: plan.id }, data: { typeId: match.id } });
+    plan.typeId = match.id;
+  }
   return (
     <div>
       <h1 className="font-display text-4xl uppercase">Sessions and prices</h1>
@@ -52,10 +90,7 @@ export default async function SessionsAdmin({
           <Label htmlFor="name">Name</Label>
           <Input className="mt-1" id="name" name="name" required />
         </div>
-        <div>
-          <Label htmlFor="program">Program</Label>
-          <Input className="mt-1" id="program" name="program" required placeholder="Speed & Agility" />
-        </div>
+        <TypeChoice id="typeId" types={types} />
         <div>
           <Label htmlFor="sessionsPerMonth">Times included</Label>
           <Input className="mt-1" id="sessionsPerMonth" name="sessionsPerMonth" type="number" min={1} required />
@@ -85,7 +120,7 @@ export default async function SessionsAdmin({
               <input type="hidden" name="id" value={plan.id} />
               <input type="hidden" name="sortOrder" value={plan.sortOrder} />
               <Input name="name" defaultValue={plan.name} required aria-label="Name" />
-              <Input name="program" defaultValue={plan.program} required aria-label="Program" />
+              <TypeChoice id={`type-${plan.id}`} types={types} value={plan.typeId ?? ""} />
               <Input name="sessionsPerMonth" type="number" min={1} defaultValue={plan.sessionsPerMonth} required aria-label="Times included" />
               <Input name="price" defaultValue={centsToDollarInput(plan.priceCents)} required aria-label="Price" />
               <BillingChoice yearly={plan.billingInterval === "YEAR"} />
