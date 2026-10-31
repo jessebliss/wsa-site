@@ -15,7 +15,12 @@ function namedCoaches(session: { coach: string | null; coaches: string[] }) {
 export async function deleteCoachLogin(id: string) {
   const coach = await prisma.staffUser.findUnique({ where: { id } });
   if (!coach) throw new Error("That coach login is already gone.");
-  const name = coach.coachName;
+  await deleteCoachNamed(coach.coachName);
+}
+
+export async function deleteCoachNamed(name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("Choose a coach.");
   const now = new Date();
 
   const upcoming = await prisma.trainingSession.findMany({
@@ -39,7 +44,7 @@ export async function deleteCoachLogin(id: string) {
   });
 
   const blockers = upcoming.filter(
-    (session) => namedCoaches(session).length === 1 && namedCoaches(session)[0] === name && session.registrations.length > 0,
+    (session) => namedCoaches(session).length === 1 && namedCoaches(session)[0] === trimmed && session.registrations.length > 0,
   );
   if (blockers.length > 0) {
     const listed = blockers
@@ -49,7 +54,7 @@ export async function deleteCoachLogin(id: string) {
     const extra = blockers.length > 3 ? ` and ${blockers.length - 3} more` : "";
     const noun = blockers.length === 1 ? "an upcoming booking that names only them" : `${blockers.length} upcoming bookings that name only them`;
     throw new Error(
-      `${name} still has ${noun}: ${listed}${extra}. Delete was refused. Those bookings were not canceled.`,
+      `${trimmed} still has ${noun}: ${listed}${extra}. Delete was refused. Those bookings were not canceled.`,
     );
   }
 
@@ -58,15 +63,15 @@ export async function deleteCoachLogin(id: string) {
       where: {
         kind: "GROUP",
         startsAt: { gte: now },
-        OR: [{ coaches: { has: name } }, { coach: name }],
+        OR: [{ coaches: { has: trimmed } }, { coach: trimmed }],
       },
     });
     for (const session of groups) {
       await tx.trainingSession.update({
         where: { id: session.id },
         data: {
-          coaches: session.coaches.filter((coachName) => coachName !== name),
-          coach: session.coach === name ? null : session.coach,
+          coaches: session.coaches.filter((coachName) => coachName !== trimmed),
+          coach: session.coach === trimmed ? null : session.coach,
         },
       });
     }
@@ -74,24 +79,24 @@ export async function deleteCoachLogin(id: string) {
     const series = await tx.eventSeries.findMany({
       where: {
         kind: "GROUP",
-        OR: [{ coaches: { has: name } }, { coach: name }],
+        OR: [{ coaches: { has: trimmed } }, { coach: trimmed }],
       },
     });
     for (const row of series) {
       await tx.eventSeries.update({
         where: { id: row.id },
         data: {
-          coaches: row.coaches.filter((coachName) => coachName !== name),
-          coach: row.coach === name ? null : row.coach,
+          coaches: row.coaches.filter((coachName) => coachName !== trimmed),
+          coach: row.coach === trimmed ? null : row.coach,
         },
       });
     }
 
     await tx.retiredCoach.upsert({
-      where: { coachName: name },
-      create: { coachName: name },
+      where: { coachName: trimmed },
+      create: { coachName: trimmed },
       update: {},
     });
-    await tx.staffUser.delete({ where: { id: coach.id } });
+    await tx.staffUser.deleteMany({ where: { coachName: trimmed } });
   });
 }

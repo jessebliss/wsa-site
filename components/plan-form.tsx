@@ -42,7 +42,7 @@ export function PlanForm({
     const body = (await response.json()) as { error?: string; redirect?: string };
     if (!response.ok || !body.redirect) {
       setPending(false);
-      setError(body.error ?? "Could not start the plan.");
+      setError(body.error ?? "Could not start the session.");
       return;
     }
     window.location.href = body.redirect;
@@ -62,7 +62,7 @@ export function PlanForm({
       <div>
         <Label htmlFor="email">Email</Label>
         <Input className="mt-1" id="email" name="email" type="email" required />
-        <p className="mt-1 text-xs text-muted-foreground">This email is how group bookings find the plan. There is no password.</p>
+        <p className="mt-1 text-xs text-muted-foreground">This email is how group bookings find the session. There is no password.</p>
       </div>
       <div>
         <Label htmlFor="phone">Phone</Label>

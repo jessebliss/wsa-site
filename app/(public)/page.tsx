@@ -5,10 +5,11 @@ import { occupiedCounts } from "@/lib/booking";
 import { formatMoney } from "@/lib/money";
 import { planCadence } from "@/lib/plan-options";
 import { loadOpenings } from "@/lib/openings";
-import { SPEED_PROGRAM, isPrivateQuarterback, matchCoachName } from "@/lib/private-quarterback";
+import { PRIVATE_QUARTERBACK_KEY, SPEED_PROGRAM, isPrivateQuarterback, matchCoachName } from "@/lib/private-quarterback";
 import { loadPrivateQuarterbackPrices, loadSavedPrivatePrices, loadSavedSpeedPrices, privateQuarterbackCoachNames } from "@/lib/private-quarterback-data";
 import { sessionCoachNames } from "@/lib/schedule-filter";
 import { etDayKey, etToUtc, shiftMonth } from "@/lib/time";
+import { ensureTrainingTypes, loadTrainingTypes } from "@/lib/training-types";
 import { PlanDisclosure } from "@/components/plan-disclosure";
 import { PublicSchedule } from "@/components/public-schedule";
 import { extendSeriesHorizon } from "@/lib/series";
@@ -24,11 +25,12 @@ export default async function SchedulePage({
   const query = await searchParams;
   const todayKey = etDayKey(new Date());
   await extendSeriesHorizon(todayKey);
+  await ensureTrainingTypes();
   const currentMonth = todayKey.slice(0, 7);
   const maxMonth = shiftMonth(currentMonth, 5);
   const rangeStart = etToUtc(todayKey, "00:00");
   const rangeEnd = etToUtc(`${shiftMonth(maxMonth, 1)}-01`, "00:00");
-  const [sessions, plans, openings] = await Promise.all([
+  const [sessions, plans, openings, types, retired] = await Promise.all([
     prisma.trainingSession.findMany({
       where: { status: { in: ["SCHEDULED", "CANCELED"] }, startsAt: { gte: rangeStart, lt: rangeEnd } },
       orderBy: { startsAt: "asc" },
@@ -38,7 +40,10 @@ export default async function SchedulePage({
       orderBy: { sortOrder: "asc" },
     }),
     loadOpenings(todayKey, etDayKey(new Date(rangeEnd.getTime() - 60 * 1000))),
+    loadTrainingTypes(),
+    prisma.retiredCoach.findMany({ select: { coachName: true } }),
   ]);
+  const retiredNames = new Set(retired.map((row) => row.coachName));
   const counts = await occupiedCounts(sessions.map((session) => session.id));
   const privateCoachNames = privateQuarterbackCoachNames(
     sessions
@@ -66,6 +71,12 @@ export default async function SchedulePage({
       ? matchCoachName(query.coach ?? "", speedCoachNames)
       : "";
   if (wantsQuarterback && linkedCoach && !privateCoachNames.includes(linkedCoach)) privateCoachNames.push(linkedCoach);
+  for (let index = privateCoachNames.length - 1; index >= 0; index -= 1) {
+    if (retiredNames.has(privateCoachNames[index])) privateCoachNames.splice(index, 1);
+  }
+  const speedType = types.find((type) => type.offeringKey === `program:${SPEED_PROGRAM}`);
+  const privateType = types.find((type) => type.offeringKey === PRIVATE_QUARTERBACK_KEY);
+  const initialTypeId = wantsSpeed && linkedCoach ? speedType?.id ?? "" : wantsQuarterback && linkedCoach ? privateType?.id ?? "" : "";
   const [privatePrices, speedPrices, savedPrivatePrices] = await Promise.all([
     loadPrivateQuarterbackPrices(privateCoachNames),
     loadSavedSpeedPrices(),
@@ -87,7 +98,7 @@ export default async function SchedulePage({
         openings={openings}
         portraits={Object.fromEntries(coaches.map((coach) => [coach.name, coach.photo]))}
         nowIso={new Date().toISOString()}
-        initialOffering={wantsSpeed && linkedCoach ? `program:${SPEED_PROGRAM}` : wantsQuarterback && linkedCoach ? "private:quarterback" : ""}
+        initialTypeId={initialTypeId}
         initialCoach={linkedCoach}
         initialStep={linkedCoach ? 3 : 1}
         speedPrices={speedPrices}
@@ -98,11 +109,20 @@ export default async function SchedulePage({
           active: plan.active,
           sortOrder: plan.sortOrder,
         }))}
+        types={types.map((type) => ({
+          id: type.id,
+          name: type.name,
+          description: type.description,
+          nextStep: type.nextStep,
+          offeringKey: type.offeringKey,
+          sortOrder: type.sortOrder,
+        }))}
         privateCoaches={privateCoachNames.map((name) => ({ name, priceCents: privatePrices[name] ?? 0 }))}
         sessions={sessions.map((session) => ({
           id: session.id,
           kind: session.kind,
           program: session.program,
+          typeId: session.typeId,
           title: session.title,
           coach: session.coach,
           coaches: session.coaches,
@@ -117,20 +137,20 @@ export default async function SchedulePage({
       >
         <PlanDisclosure>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Each plan is a number of group sessions in that program, billed monthly or once a year. Unused sessions do not roll over. Camps and private lessons are not included.
+            Each session includes group times in that program, billed monthly or once a year. Unused times do not roll over. Camps and private lessons are not included.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {plans.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Plans will show here once the academy publishes them.</p>
+              <p className="text-sm text-muted-foreground">Sessions will show here once the academy publishes them.</p>
             ) : (
               plans.map((plan) => (
-                <Link key={plan.id} href={`/plans/${plan.id}`} className="rounded-2xl bg-white p-5">
+                <Link key={plan.id} href={`/sessions/${plan.id}`} className="rounded-2xl bg-white p-5">
                   <p className="text-xs font-semibold uppercase tracking-wide text-primary">{plan.program}</p>
                   <h3 className="font-display text-3xl uppercase">{plan.name}</h3>
                   <p className="mt-2 font-display text-4xl" data-plan-cadence={planCadence(plan.billingInterval)}>
                     {formatMoney(plan.priceCents)}<span className="text-base"> {planCadence(plan.billingInterval)}</span>
                   </p>
-                  <p className="mt-1 text-sm">{plan.sessionsPerMonth} group sessions {plan.billingInterval === "YEAR" ? "each year" : "each month"}</p>
+                  <p className="mt-1 text-sm">{plan.sessionsPerMonth} group times {plan.billingInterval === "YEAR" ? "each year" : "each month"}</p>
                 </Link>
               ))
             )}

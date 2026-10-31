@@ -291,7 +291,7 @@ async function sendSubscriptionReceipt(subscriptionId: string) {
       "",
       `Player: ${sub.playerName}`,
       `Parent: ${sub.parentName}`,
-      `Plan: ${sub.plan?.name || sub.planName || "Membership"}`,
+      `Session: ${sub.plan?.name || sub.planName || "Membership"}`,
       `Amount: ${formatMoney(sub.priceCents)} ${sub.plan?.billingInterval === "YEAR" ? "per year" : "per month"}`,
       `Group sessions this period: ${sub.sessionsIncluded}`,
       "Unused sessions expire at the end of the billing period and do not roll over.",

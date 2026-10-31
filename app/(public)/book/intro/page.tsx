@@ -26,7 +26,7 @@ export default async function IntroCheckoutPage() {
       <h1 className="font-display text-4xl uppercase">{INTRO_LABEL}</h1>
       <p className="mt-2 text-sm">{INTRO_NOTE}</p>
       <p className="mt-3 text-sm font-semibold">{formatMoney(INTRO_PRICE_CENTS)}</p>
-      <p className="mt-2 text-sm text-muted-foreground">This is a one-time payment. It is not on the calendar. Monthly plans do not cover it.</p>
+      <p className="mt-2 text-sm text-muted-foreground">This is a one-time payment. It is not on the calendar. Monthly sessions do not cover it.</p>
       {!waiver ? (
         <p className="mt-6 rounded-xl bg-white p-4 text-sm">The waiver is not published yet.</p>
       ) : (

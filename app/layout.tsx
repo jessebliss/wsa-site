@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     template: "%s | Walker Sports Academy",
   },
   description:
-    "Book Walker Sports Academy sessions, monthly plans, and camps.",
+    "Book Walker Sports Academy training, monthly sessions, and camps.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

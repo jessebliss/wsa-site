@@ -6,6 +6,7 @@ import { type SessionFormValues } from "@/lib/session-defaults";
 import { centsToDollarInput } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { loadCoachRoster } from "@/lib/roster";
+import { ensureTrainingTypes, loadTrainingTypes } from "@/lib/training-types";
 import { ruleForForm } from "@/lib/series";
 import { addMonthsToDay, etDayKey, etParts } from "@/lib/time";
 
@@ -20,9 +21,10 @@ export default async function EditSessionPage({
 }) {
   const { id } = await params;
   const query = await searchParams;
+  await ensureTrainingTypes();
   const session = await prisma.trainingSession.findUnique({ where: { id }, include: { series: true } });
   if (!session) notFound();
-  const roster = await loadCoachRoster();
+  const [roster, types] = await Promise.all([loadCoachRoster(), loadTrainingTypes()]);
   const today = etDayKey(new Date());
   const parts = etParts(session.startsAt);
   const end = etParts(session.endsAt);
@@ -31,6 +33,7 @@ export default async function EditSessionPage({
     id: session.id,
     kind: session.kind,
     program: session.program,
+    typeId: session.typeId ?? "",
     title: session.title,
     coach: session.coach ?? "",
     coaches: session.kind === "GROUP" ? session.coaches : [],
@@ -55,6 +58,7 @@ export default async function EditSessionPage({
       <AdminError message={query.error} />
       <SessionForm
         roster={roster}
+        types={types.map((type) => ({ id: type.id, name: type.name }))}
         values={values}
         minMonth={addMonthsToDay(today, -12).slice(0, 7)}
         maxMonth={addMonthsToDay(today, 18).slice(0, 7)}

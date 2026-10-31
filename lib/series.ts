@@ -8,6 +8,7 @@ export type EventScope = "this" | "following" | "all";
 export type EventInput = {
   kind: "GROUP" | "CAMP" | "PRIVATE";
   program: string;
+  typeId: string | null;
   title: string;
   coach: string | null;
   coaches: string[];
@@ -97,6 +98,7 @@ function seriesColumns(input: EventInput, anchorDay: string) {
     anchorDay,
     kind: input.kind,
     program: input.program,
+    typeId: input.typeId,
     title: input.title,
     coach: input.kind === "GROUP" ? null : input.coach,
     coaches: input.kind === "GROUP" ? input.coaches : [],
@@ -114,6 +116,7 @@ function sessionFields(input: EventInput, day: string, seriesId: string | null) 
   return {
     kind: input.kind,
     program: input.program,
+    typeId: input.typeId,
     title: input.title,
     coach: input.kind === "GROUP" ? null : input.coach,
     coaches: input.kind === "GROUP" ? input.coaches : [],
@@ -134,12 +137,13 @@ function checkInput(input: EventInput) {
   input.start = clock(input.start);
   input.end = clock(input.end);
   occurrenceBounds(input.date, input.start, input.end);
-  if (!input.program || !input.title || !input.location) throw new Error("Program, title, and location are required.");
+  if (!input.typeId) throw new Error("Choose a type.");
+  if (!input.program || !input.title || !input.location) throw new Error("Type, title, and location are required.");
   if (input.program === "QB Introduction Session") {
     throw new Error("QB Introduction Session is not scheduled. Parents book it from Choose your training.");
   }
   if (!Number.isInteger(input.capacity) || input.capacity < 1) throw new Error("Capacity has to be at least 1.");
-  if (!["GROUP", "CAMP", "PRIVATE"].includes(input.kind)) throw new Error("Choose a session type.");
+  if (!["GROUP", "CAMP", "PRIVATE"].includes(input.kind)) throw new Error("Choose group, camp, or private.");
   assertRule(input.rule, input.date);
 }
 
@@ -212,6 +216,7 @@ function inputFromSeries(series: EventSeries): EventInput {
   return {
     kind: series.kind,
     program: series.program,
+    typeId: series.typeId,
     title: series.title,
     coach: series.coach,
     coaches: series.coaches,

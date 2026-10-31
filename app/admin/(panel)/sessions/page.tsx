@@ -30,9 +30,9 @@ function BillingChoice({ yearly }: { yearly: boolean }) {
 }
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Plans" };
+export const metadata = { title: "Sessions" };
 
-export default async function PlansAdmin({
+export default async function SessionsAdmin({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string }>;
@@ -41,9 +41,9 @@ export default async function PlansAdmin({
   const plans = await prisma.plan.findMany({ orderBy: { sortOrder: "asc" } });
   return (
     <div>
-      <h1 className="font-display text-4xl uppercase">Plans and prices</h1>
+      <h1 className="font-display text-4xl uppercase">Sessions and prices</h1>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-        Monthly or yearly. Yearly bills once a year. A price change applies to new signups. People already on a plan keep their price and included sessions until you change that membership.
+        Monthly or yearly. Yearly bills once a year. A price change applies to new signups. People already on a session keep their price and included times until you change that membership.
       </p>
       <AdminError message={params.error} />
       <DisclosurePanel label="Create new" hideLabel="Hide form" className="mt-4">
@@ -57,7 +57,7 @@ export default async function PlansAdmin({
           <Input className="mt-1" id="program" name="program" required placeholder="Speed & Agility" />
         </div>
         <div>
-          <Label htmlFor="sessionsPerMonth">Sessions included</Label>
+          <Label htmlFor="sessionsPerMonth">Times included</Label>
           <Input className="mt-1" id="sessionsPerMonth" name="sessionsPerMonth" type="number" min={1} required />
         </div>
         <div>
@@ -70,7 +70,7 @@ export default async function PlansAdmin({
           <input type="checkbox" name="active" defaultChecked /> Active
         </label>
         <div className="sm:col-span-2">
-          <Button type="submit">Add plan</Button>
+          <Button type="submit">Add session</Button>
         </div>
       </form>
       </DisclosurePanel>
@@ -79,29 +79,29 @@ export default async function PlansAdmin({
           <li key={plan.id} className="rounded-2xl bg-white p-4">
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <i className="h-3 w-3 rounded-sm" style={{ backgroundColor: eventColor(plan.color).hex }} aria-hidden="true" />
-              {plan.active ? "Active" : "Hidden"} · {formatMoney(plan.priceCents)} {planCadence(plan.billingInterval)} · {plan.sessionsPerMonth} sessions
+              {plan.active ? "Active" : "Hidden"} · {formatMoney(plan.priceCents)} {planCadence(plan.billingInterval)} · {plan.sessionsPerMonth} times
             </p>
             <form action={savePlan} className="mt-3 grid gap-3 sm:grid-cols-2">
               <input type="hidden" name="id" value={plan.id} />
               <input type="hidden" name="sortOrder" value={plan.sortOrder} />
               <Input name="name" defaultValue={plan.name} required aria-label="Name" />
               <Input name="program" defaultValue={plan.program} required aria-label="Program" />
-              <Input name="sessionsPerMonth" type="number" min={1} defaultValue={plan.sessionsPerMonth} required aria-label="Sessions included" />
+              <Input name="sessionsPerMonth" type="number" min={1} defaultValue={plan.sessionsPerMonth} required aria-label="Times included" />
               <Input name="price" defaultValue={centsToDollarInput(plan.priceCents)} required aria-label="Price" />
               <BillingChoice yearly={plan.billingInterval === "YEAR"} />
               <PlanColor value={plan.color} />
               <label className="flex items-center gap-2 text-sm font-semibold">
                 <input type="checkbox" name="active" defaultChecked={plan.active} /> Active
               </label>
-              <Button type="submit" variant="outline">Save plan</Button>
+              <Button type="submit" variant="outline">Save session</Button>
             </form>
             <ConfirmForm
               action={deletePlan}
               className="mt-3"
-              message="Delete this plan so it is no longer offered? Memberships that are not canceled will block this. People are not canceled automatically."
+              message="Delete this session so it is no longer offered? Memberships that are not canceled will block this. People are not canceled automatically."
             >
               <input type="hidden" name="id" value={plan.id} />
-              <Button type="submit" variant="outline">Delete plan</Button>
+              <Button type="submit" variant="outline">Delete session</Button>
             </ConfirmForm>
           </li>
         ))}

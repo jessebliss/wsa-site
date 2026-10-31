@@ -5,7 +5,7 @@ import { etToUtc } from "@/lib/time";
 import { normalizeEmail } from "@/lib/utils";
 
 export function subscriptionPlanName(sub: { plan: { name: string } | null; planName: string }) {
-  return sub.plan?.name || sub.planName || "Deleted plan";
+  return sub.plan?.name || sub.planName || "Deleted session";
 }
 
 async function load(id: string) {
@@ -23,7 +23,7 @@ async function load(id: string) {
 export async function changeSubscriptionPlan(id: string, planId: string) {
   const local = await load(id);
   const plan = await prisma.plan.findUnique({ where: { id: planId } });
-  if (!plan || !plan.active) throw new Error("That plan is not available.");
+  if (!plan || !plan.active) throw new Error("That session is not available.");
   const priced = await ensurePlanStripePrice(plan);
   const stripe = getStripe();
   const remote = await stripe.subscriptions.retrieve(local.stripeSubscriptionId!);
@@ -53,7 +53,7 @@ export async function changeSubscriptionPlan(id: string, planId: string) {
 
 export async function setCustomPrice(id: string, priceCents: number) {
   const local = await load(id);
-  if (!local.plan) throw new Error("This subscription's plan was deleted.");
+  if (!local.plan) throw new Error("This subscription's session was deleted.");
   const pricedPlan = await ensurePlanStripePrice(local.plan);
   if (!pricedPlan.stripeProductId) throw new Error("Stripe product is missing.");
   const stripe = getStripe();
@@ -141,7 +141,7 @@ export async function renewSubscription(id: string) {
     });
     return;
   }
-  if (!local.plan || !local.planId) throw new Error("This subscription's plan was deleted.");
+  if (!local.plan || !local.planId) throw new Error("This subscription's session was deleted.");
   const priced = await ensurePlanStripePrice(local.plan);
   if (!priced.stripePriceId) throw new Error("Stripe price is missing.");
   const created = await stripe.subscriptions.create({
@@ -187,7 +187,7 @@ export async function createVenmoSubscription(input: {
   if (!parentName || !playerName || !phone) throw new Error("Parent, player, and phone are required.");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a real email address.");
   const plan = await prisma.plan.findUnique({ where: { id: input.planId } });
-  if (!plan) throw new Error("Choose a plan.");
+  if (!plan) throw new Error("Choose a session.");
   return prisma.subscription.create({
     data: {
       email,

@@ -4,6 +4,7 @@ export type SessionFormValues = {
   id?: string;
   kind: "GROUP" | "CAMP" | "PRIVATE";
   program: string;
+  typeId: string;
   title: string;
   coach: string;
   coaches: string[];
@@ -22,6 +23,7 @@ export function blankSessionValues(today: string, roster: string[], location: st
   return {
     kind: "GROUP",
     program: "Quarterback Training",
+    typeId: "",
     title: "",
     coach: "",
     coaches: roster,

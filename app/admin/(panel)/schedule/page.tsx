@@ -4,6 +4,7 @@ import { DisclosurePanel } from "@/components/disclosure-panel";
 import { SessionForm } from "@/components/session-form";
 import { colorForProgram } from "@/lib/plan-options";
 import { blankSessionValues } from "@/lib/session-defaults";
+import { ensureTrainingTypes, loadTrainingTypes } from "@/lib/training-types";
 import { loadCoachRoster } from "@/lib/roster";
 import { sessionCoachNames } from "@/lib/schedule-filter";
 import { extendSeriesHorizon } from "@/lib/series";
@@ -22,9 +23,10 @@ export default async function ScheduleAdmin({
   const params = await searchParams;
   const today = etDayKey(new Date());
   await extendSeriesHorizon(today);
+  await ensureTrainingTypes();
   const minMonth = shiftMonth(today.slice(0, 7), -12);
   const maxMonth = shiftMonth(today.slice(0, 7), 8);
-  const [sessions, roster, plans] = await Promise.all([
+  const [sessions, roster, plans, types] = await Promise.all([
     prisma.trainingSession.findMany({
       where: {
         startsAt: {
@@ -36,6 +38,7 @@ export default async function ScheduleAdmin({
     }),
     loadCoachRoster(),
     prisma.plan.findMany({ select: { program: true, color: true, active: true, sortOrder: true } }),
+    loadTrainingTypes(),
   ]);
 
   return (
@@ -71,6 +74,7 @@ export default async function ScheduleAdmin({
       <DisclosurePanel label="New session" hideLabel="Hide new session" className="mt-8">
         <SessionForm
           roster={roster}
+          types={types.map((type) => ({ id: type.id, name: type.name }))}
           minMonth={addMonthsToDay(today, -12).slice(0, 7)}
           maxMonth={addMonthsToDay(today, 18).slice(0, 7)}
           values={blankSessionValues(today, roster, PARK)}

@@ -45,10 +45,10 @@ export default async function SessionCheckoutPage({
       </p>
       {session.kind === "GROUP" ? (
         <p className="mt-2 text-sm text-muted-foreground">
-          If this email has an active {session.program} plan with sessions left, confirming the spot uses one session instead of a card.
+          If this email has an active {session.program} session with times left, confirming the spot uses one time instead of a card.
         </p>
       ) : (
-        <p className="mt-2 text-sm text-muted-foreground">This is a one-time payment. Monthly plans do not cover it.</p>
+        <p className="mt-2 text-sm text-muted-foreground">This is a one-time payment. Monthly sessions do not cover it.</p>
       )}
       {spotsLeft <= 0 || !waiver || !coachOpen ? (
         <p className="mt-6 rounded-xl bg-white p-4 text-sm">

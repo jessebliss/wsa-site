@@ -31,7 +31,7 @@ export default async function ConfirmedPage({
             <p className="mt-1 text-sm">{INTRO_NOTE} This session is not on the calendar.</p>
           )}
           {registration.kind === "PLAN_CREDIT" ? (
-            <p className="mt-4 text-sm">This session is covered by the monthly plan on {registration.email}. One session was used.</p>
+            <p className="mt-4 text-sm">This time is covered by the monthly session on {registration.email}. One time was used.</p>
           ) : (
             <p className="mt-4 text-sm">Payment status: {registration.paymentStatus}.</p>
           )}

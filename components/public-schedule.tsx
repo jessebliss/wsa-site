@@ -12,7 +12,6 @@ import { INTRO_KEY, INTRO_LABEL, INTRO_NOTE, INTRO_PRICE_CENTS, isIntro } from "
 import { formatMoney } from "@/lib/money";
 import {
   PRIVATE_QUARTERBACK_KEY,
-  PRIVATE_QUARTERBACK_LABEL,
   coachHasLogin,
   SPEED_PROGRAM,
   isPrivateQuarterback,
@@ -21,13 +20,14 @@ import {
   type PrivateHourSession,
 } from "@/lib/private-quarterback";
 import { colorForProgram, type PlanColorSource } from "@/lib/plan-options";
-import { offeringKey, offeringLabel, offeringRank, openSessions, sessionCoachNames } from "@/lib/schedule-filter";
+import { openSessions, sessionCoachNames } from "@/lib/schedule-filter";
 import { dayKeysForMonth, etDayKey, etToUtc, formatEt, formatEtTime } from "@/lib/time";
 
 export type ScheduleSession = {
   id: string;
   kind: "GROUP" | "CAMP" | "PRIVATE";
   program: string;
+  typeId: string | null;
   title: string;
   coach: string | null;
   coaches: string[];
@@ -163,12 +163,13 @@ export function PublicSchedule({
   portraits,
   privateCoaches,
   nowIso,
-  initialOffering = "",
+  initialTypeId = "",
   initialCoach = "",
   initialStep = 1,
   speedPrices = {},
   savedPrivatePrices = {},
   plans = [],
+  types = [],
   children,
 }: {
   sessions: ScheduleSession[];
@@ -179,7 +180,7 @@ export function PublicSchedule({
   portraits: Record<string, string>;
   privateCoaches: PrivateCoachChoice[];
   nowIso: string;
-  initialOffering?: string;
+  initialTypeId?: string;
   initialCoach?: string;
   initialStep?: 1 | 2 | 3;
   /** Saved public speed prices, keyed by coach. Missing means the session price. */
@@ -187,10 +188,11 @@ export function PublicSchedule({
   /** Saved private quarterback prices. Missing means the lesson keeps its own price. */
   savedPrivatePrices?: Record<string, number>;
   plans?: PlanColorSource[];
+  types?: { id: string; name: string; description: string; nextStep: string; offeringKey: string | null; sortOrder: number }[];
   children?: ReactNode;
 }) {
   const [step, setStep] = useState<1 | 2 | 3>(initialStep);
-  const [offeringId, setOfferingId] = useState(initialOffering);
+  const [offeringId, setOfferingId] = useState(initialTypeId);
   const [coach, setCoach] = useState(initialCoach);
   const [showGroups, setShowGroups] = useState(false);
   const [groupMonth, setGroupMonth] = useState(currentMonth);
@@ -201,28 +203,45 @@ export function PublicSchedule({
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const bookable = useMemo(() => openSessions(sessions, openings), [sessions, openings]);
   const offerings = useMemo(() => {
-    const rows = new Map<string, { id: string; label: string; rank: number }>();
-    for (const session of bookable) {
-      const id = offeringKey(session);
-      if (!rows.has(id)) rows.set(id, { id, label: offeringLabel(session), rank: offeringRank(session) });
+    const rows = types
+      .filter((type) => {
+        if (type.offeringKey === INTRO_KEY) return true;
+        if (type.offeringKey === PRIVATE_QUARTERBACK_KEY && privateCoaches.length > 0) return true;
+        return bookable.some((session) => session.typeId === type.id);
+      })
+      .map((type) => ({
+        id: type.id,
+        label: type.name,
+        description: type.description,
+        next: type.nextStep || "Choose a coach",
+        href: type.offeringKey === INTRO_KEY ? "/book/intro" : "",
+        offeringKey: type.offeringKey,
+        sortOrder: type.sortOrder,
+      }));
+    if (!rows.some((row) => row.href === "/book/intro")) {
+      rows.push({
+        id: INTRO_KEY,
+        label: INTRO_LABEL,
+        description: INTRO_NOTE,
+        next: "Continue to checkout",
+        href: "/book/intro",
+        offeringKey: INTRO_KEY,
+        sortOrder: 2,
+      });
     }
-    if (privateCoaches.length > 0 && !rows.has(PRIVATE_QUARTERBACK_KEY)) {
-      rows.set(PRIVATE_QUARTERBACK_KEY, { id: PRIVATE_QUARTERBACK_KEY, label: PRIVATE_QUARTERBACK_LABEL, rank: 0 });
-    }
-    if (!rows.has(INTRO_KEY)) {
-      rows.set(INTRO_KEY, { id: INTRO_KEY, label: INTRO_LABEL, rank: 2 });
-    }
-    return Array.from(rows.values()).sort((a, b) => a.rank - b.rank || a.label.localeCompare(b.label));
-  }, [bookable, privateCoaches.length]);
+    return rows.sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label));
+  }, [types, bookable, privateCoaches.length]);
 
+  const offering = offerings.find((item) => item.id === offeringId);
+  const speedOffering = offering?.offeringKey === `program:${SPEED_PROGRAM}`;
   const coachesForOffering = useMemo(() => {
     const order = Object.keys(portraits);
     const prices = new Map<string, number[]>();
     for (const session of bookable) {
-      if (offeringKey(session) !== offeringId) continue;
+      if (session.typeId !== offeringId) continue;
       for (const name of sessionCoachNames(session)) {
         const list = prices.get(name) ?? [];
-        const speed = offeringId === `program:${SPEED_PROGRAM}` ? speedPrices[name] : undefined;
+        const speed = speedOffering ? speedPrices[name] : undefined;
         list.push(speed ?? session.priceCents);
         prices.set(name, list);
       }
@@ -234,13 +253,12 @@ export function PublicSchedule({
         const bi = order.indexOf(b.name);
         return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi) || a.name.localeCompare(b.name);
       });
-  }, [bookable, offeringId, portraits, speedPrices]);
+  }, [bookable, offeringId, portraits, speedPrices, speedOffering]);
 
-  const offering = offerings.find((item) => item.id === offeringId);
-  const privateBooking = offeringId === PRIVATE_QUARTERBACK_KEY;
+  const privateBooking = offering?.offeringKey === PRIVATE_QUARTERBACK_KEY;
   const usesAvailability = privateBooking && coachHasLogin(openings, coach);
   const onThisCoach = (session: ScheduleSession) =>
-    offeringKey(session) === offeringId && sessionCoachNames(session).includes(coach);
+    session.typeId === offeringId && sessionCoachNames(session).includes(coach);
   const chosen = bookable.filter(onThisCoach);
   const canceledChosen = sessions.filter((session) => session.status === "CANCELED" && onThisCoach(session));
   const privatePrice = privateCoaches.find((person) => person.name === coach)?.priceCents ?? 0;
@@ -313,7 +331,7 @@ export function PublicSchedule({
     return sessions
       .filter((session) => {
         if (session.kind !== "GROUP" || isIntro(session) || sessionCoachNames(session).length === 0) return false;
-        return !scopedTraining || offeringKey(session) === scopedTraining;
+        return !scopedTraining || session.typeId === scopedTraining;
       })
       .map((session) => sessionBlock(session, plans));
   }, [sessions, scopedTraining, plans]);
@@ -323,7 +341,7 @@ export function PublicSchedule({
       .filter((session) => {
         if (isIntro(session)) return false;
         if (session.kind !== "GROUP" && session.kind !== "PRIVATE" && session.kind !== "CAMP") return false;
-        if (offeringId && offeringKey(session) !== offeringId) return false;
+        if (offeringId && session.typeId !== offeringId) return false;
         return sessionCoachNames(session).includes(coach);
       })
       .map((session) => {
@@ -384,30 +402,39 @@ export function PublicSchedule({
               Nothing is open on the schedule right now. Call 727-744-6880 and the academy will post the next session.
             </p>
           ) : (
-            <div className="mt-4 grid gap-3">
-              {offerings.map((item) =>
-                item.id === INTRO_KEY ? (
-                  <Link
-                    key={item.id}
-                    href="/book/intro"
-                    data-offering={item.label}
-                    className="block min-h-14 rounded-2xl bg-white px-4 py-4 text-left"
-                  >
-                    <span className="block font-display text-2xl uppercase leading-none">{item.label}</span>
-                    <span className="mt-2 block text-sm leading-snug text-muted-foreground">{INTRO_NOTE} {formatMoney(INTRO_PRICE_CENTS)}.</span>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {offerings.map((item) => {
+                const body = (
+                  <>
+                    <span className="block font-display text-3xl uppercase leading-none">{item.label}</span>
+                    {item.description ? (
+                      <span className="mt-3 block text-sm leading-snug text-muted-foreground">
+                        {item.description}
+                        {item.href === "/book/intro" ? ` ${formatMoney(INTRO_PRICE_CENTS)}.` : ""}
+                      </span>
+                    ) : null}
+                    <span className="mt-4 block text-sm font-semibold text-primary">{item.next}</span>
+                  </>
+                );
+                const className = "flex min-h-44 flex-col rounded-2xl bg-white px-5 py-5 text-left";
+                return item.href ? (
+                  <Link key={item.id} href={item.href} data-offering={item.label} data-next={item.next} className={className}>
+                    {body}
                   </Link>
                 ) : (
                   <button
                     key={item.id}
                     type="button"
                     data-offering={item.label}
+                    data-type={item.id}
+                    data-next={item.next}
                     onClick={() => pickOffering(item.id)}
-                    className="min-h-14 rounded-2xl bg-white px-4 py-4 text-left"
+                    className={className}
                   >
-                    <span className="block font-display text-2xl uppercase leading-none">{item.label}</span>
+                    {body}
                   </button>
-                ),
-              )}
+                );
+              })}
             </div>
           )
         ) : null}

@@ -48,7 +48,7 @@ export default async function RosterPage({
           <li key={row.id} className="rounded-xl bg-white p-4 text-sm">
             <p className="font-semibold">{row.playerName}</p>
             <p>{row.parentName} · {row.email} · {row.phone}</p>
-            <p className="text-muted-foreground">{row.kind === "PLAN_CREDIT" ? "Plan" : "Drop-in"} · {paymentLabel(row.paymentStatus)} · {formatMoney(row.amountCents)}</p>
+            <p className="text-muted-foreground">{row.kind === "PLAN_CREDIT" ? "Session" : "Drop-in"} · {paymentLabel(row.paymentStatus)} · {formatMoney(row.amountCents)}</p>
             <p>Attended: {row.attended == null ? "Not marked" : row.attended ? "Yes" : "No"}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <form action={setAttendance}>

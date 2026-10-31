@@ -224,7 +224,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "Card checkout needs a Stripe test key. Monthly plan credits still confirm without a card when this email has sessions left.",
+            "Card checkout needs a Stripe test key. Monthly session credits still confirm without a card when this email has times left.",
         },
         { status: 503 },
       );

@@ -80,12 +80,12 @@ export default async function SubscriptionsPage({
           <Input className="mt-1" id="playerName" name="playerName" required />
         </div>
         <div>
-          <Label htmlFor="planId">Plan</Label>
+          <Label htmlFor="planId">Session</Label>
           <select id="planId" name="planId" required className="mt-1 h-11 w-full rounded-md border border-border bg-white px-3" defaultValue="">
             <option value="" disabled>Choose</option>
             {plans.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.name} · {formatMoney(item.priceCents)} {item.billingInterval === "YEAR" ? "per year" : "per month"} · {item.sessionsPerMonth} sessions
+                {item.name} · {formatMoney(item.priceCents)} {item.billingInterval === "YEAR" ? "per year" : "per month"} · {item.sessionsPerMonth} times
               </option>
             ))}
           </select>
@@ -125,13 +125,13 @@ export default async function SubscriptionsPage({
           </select>
         </div>
         <div>
-          <Label htmlFor="plan">Plan</Label>
+          <Label htmlFor="plan">Session</Label>
           <select id="plan" name="plan" defaultValue={planIds.has(plan) || plan === "none" ? plan : ""} className="mt-1 h-11 w-full rounded-md border border-border bg-white px-3">
-            <option value="">All plans</option>
+            <option value="">All sessions</option>
             {plans.map((item) => (
               <option key={item.id} value={item.id}>{item.name}</option>
             ))}
-            <option value="none">No plan on file</option>
+            <option value="none">No session on file</option>
           </select>
         </div>
         <div className="flex items-end gap-3">

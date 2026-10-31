@@ -119,7 +119,7 @@ export async function previewCredit(emailRaw: string, sessionId: string) {
     return {
       covered: false as const,
       priceCents: session.priceCents,
-      message: "No active plan with sessions left for this program. This booking is a one-time payment.",
+      message: "No active session with times left for this program. This booking is a one-time payment.",
     };
   }
   const plan = sub.plan;
@@ -127,7 +127,7 @@ export async function previewCredit(emailRaw: string, sessionId: string) {
     return {
       covered: false as const,
       priceCents: session.priceCents,
-      message: "No active plan with sessions left for this program. This booking is a one-time payment.",
+      message: "No active session with times left for this program. This booking is a one-time payment.",
     };
   }
   const left = sub.sessionsIncluded - sub.sessionsUsed;
@@ -136,7 +136,7 @@ export async function previewCredit(emailRaw: string, sessionId: string) {
     priceCents: 0,
     planName: plan.name,
     sessionsLeft: left,
-    message: `Covered by ${plan.name}. ${left} session${left === 1 ? "" : "s"} left this period.`,
+    message: `Covered by ${plan.name}. ${left} time${left === 1 ? "" : "s"} left this period.`,
   };
 }
 

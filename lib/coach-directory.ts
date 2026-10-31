@@ -79,7 +79,7 @@ export async function loadCoachDirectory() {
     if (!ordered.includes(name)) ordered.push(name);
   }
 
-  const entries: CoachDirectoryEntry[] = ordered.map((coachName) => {
+  const entries: CoachDirectoryEntry[] = ordered.filter((coachName) => !retiredNames.has(coachName)).map((coachName) => {
     const login = logins.get(coachName);
     const saved = savedByName.get(coachName);
     const offersPrivate = privateNames.has(coachName);

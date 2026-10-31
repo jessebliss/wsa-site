@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     "Email",
     "Phone",
     "Player",
-    "Plan or session",
+    "Name",
     "When (ET)",
     "Amount",
     "Payment status",
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
     header.join(","),
     ...registrations.map((row) =>
       [
-        row.kind === "PLAN_CREDIT" ? "Group session (plan)" : "Session",
+        row.kind === "PLAN_CREDIT" ? "Included time" : "Drop-in",
         row.createdAt.toISOString(),
         row.parentName,
         row.email,
@@ -71,13 +71,13 @@ export async function GET(request: Request) {
     ),
     ...subscriptions.map((row) =>
       [
-        "Monthly plan",
+        "Monthly session",
         row.createdAt.toISOString(),
         row.parentName,
         row.email,
         row.phone,
         row.playerName,
-        row.plan?.name || row.planName || "Deleted plan",
+        row.plan?.name || row.planName || "Deleted session",
         row.currentPeriodEnd ? formatEtLong(row.currentPeriodEnd) : "",
         formatMoney(row.priceCents),
         row.status,

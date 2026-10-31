@@ -12,7 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { type RepeatRule } from "@/lib/recurrence";
 import { cancelEvent, createEvent, deleteEvent, updateEvent, type EventInput, type EventScope } from "@/lib/series";
 import { getStripe, stripeConfigured } from "@/lib/stripe";
-import { deleteCoachLogin } from "@/lib/coach-admin";
+import { deleteCoachNamed } from "@/lib/coach-admin";
 import {
   cancelAtPeriodEnd,
   cancelNow,
@@ -187,15 +187,19 @@ function readRule(formData: FormData): RepeatRule {
   };
 }
 
-function readEvent(formData: FormData): EventInput {
+async function readEvent(formData: FormData): Promise<EventInput> {
   const kind = String(formData.get("kind") ?? "GROUP") as EventInput["kind"];
   const coaches = formData
     .getAll("coaches")
     .map((value) => String(value).trim())
     .filter(Boolean);
+  const typeId = String(formData.get("typeId") ?? "").trim();
+  const type = typeId ? await prisma.trainingType.findUnique({ where: { id: typeId } }) : null;
+  if (!type) throw new Error("Choose a type.");
   return {
     kind,
-    program: String(formData.get("program") ?? "").trim(),
+    typeId: type.id,
+    program: type.colorProgram || type.name,
     title: String(formData.get("title") ?? "").trim(),
     coach: kind === "GROUP" ? null : String(formData.get("coach") ?? "").trim() || null,
     coaches: kind === "GROUP" ? Array.from(new Set(coaches)) : [],
@@ -234,9 +238,9 @@ export async function saveSession(formData: FormData) {
       if (session?.seriesId && !["this", "following", "all"].includes(String(formData.get("scope") ?? ""))) {
         throw new Error("Choose this occurrence, this and following, or the whole series.");
       }
-      await updateEvent(id, scope, readEvent(formData));
+      await updateEvent(id, scope, await readEvent(formData));
     } else {
-      await createEvent(readEvent(formData));
+      await createEvent(await readEvent(formData));
     }
   } catch (error) {
     fail(back, error);
@@ -287,7 +291,7 @@ export async function savePlan(formData: FormData) {
     };
     if (!data.name || !data.program) throw new Error("Name and program are required.");
     if (!Number.isInteger(data.sessionsPerMonth) || data.sessionsPerMonth < 1) {
-      throw new Error("Sessions included has to be at least 1.");
+      throw new Error("Times included has to be at least 1.");
     }
     const plan = id
       ? await prisma.plan.update({ where: { id }, data })
@@ -300,11 +304,11 @@ export async function savePlan(formData: FormData) {
       await ensurePlanStripePrice(plan);
     }
   } catch (error) {
-    fail("/admin/plans", error);
+    fail("/admin/sessions", error);
   }
   revalidatePath("/");
-  revalidatePath("/admin/plans");
-  redirect("/admin/plans");
+  revalidatePath("/admin/sessions");
+  redirect("/admin/sessions");
 }
 
 export async function deletePlan(formData: FormData) {
@@ -312,14 +316,14 @@ export async function deletePlan(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   try {
     const plan = await prisma.plan.findUnique({ where: { id } });
-    if (!plan) throw new Error("That plan is already gone.");
+    if (!plan) throw new Error("That session is already gone.");
     const live = await prisma.subscription.count({
       where: { planId: id, status: { not: "CANCELED" } },
     });
     if (live > 0) {
       const noun = live === 1 ? "membership that is not canceled" : "memberships that are not canceled";
       throw new Error(
-        `This plan still has ${live} ${noun}. Delete was refused. Those people were not canceled automatically.`,
+        `This session still has ${live} ${noun}. Delete was refused. Those people were not canceled automatically.`,
       );
     }
     await prisma.$transaction([
@@ -327,12 +331,12 @@ export async function deletePlan(formData: FormData) {
       prisma.plan.delete({ where: { id } }),
     ]);
   } catch (error) {
-    fail("/admin/plans", error);
+    fail("/admin/sessions", error);
   }
   revalidatePath("/");
-  revalidatePath("/admin/plans");
+  revalidatePath("/admin/sessions");
   revalidatePath("/admin/subscriptions");
-  redirect("/admin/plans");
+  redirect("/admin/sessions");
 }
 
 export async function createVenmoMembership(formData: FormData) {
@@ -354,10 +358,79 @@ export async function createVenmoMembership(formData: FormData) {
   redirect("/admin/subscriptions");
 }
 
+export async function createTrainingType(formData: FormData) {
+  await requireAdmin();
+  try {
+    const name = String(formData.get("name") ?? "").trim();
+    const description = String(formData.get("description") ?? "").trim();
+    const nextStep = String(formData.get("nextStep") ?? "").trim() || "Choose a coach";
+    if (!name) throw new Error("Name the type.");
+    const taken = await prisma.trainingType.findUnique({ where: { name } });
+    if (taken) throw new Error("That type already exists.");
+    const latest = await prisma.trainingType.findFirst({ orderBy: { sortOrder: "desc" }, select: { sortOrder: true } });
+    await prisma.trainingType.create({
+      data: {
+        name,
+        description,
+        nextStep,
+        colorProgram: name,
+        sortOrder: (latest?.sortOrder ?? 0) + 1,
+      },
+    });
+  } catch (error) {
+    fail("/admin/types", error);
+  }
+  revalidatePath("/");
+  revalidatePath("/admin/types");
+  redirect("/admin/types");
+}
+
+export async function updateTrainingType(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  try {
+    const name = String(formData.get("name") ?? "").trim();
+    const description = String(formData.get("description") ?? "").trim();
+    const nextStep = String(formData.get("nextStep") ?? "").trim() || "Choose a coach";
+    if (!name) throw new Error("Name the type.");
+    const taken = await prisma.trainingType.findFirst({ where: { name, NOT: { id } } });
+    if (taken) throw new Error("That type already exists.");
+    await prisma.trainingType.update({ where: { id }, data: { name, description, nextStep } });
+  } catch (error) {
+    fail("/admin/types", error);
+  }
+  revalidatePath("/");
+  revalidatePath("/admin/types");
+  redirect("/admin/types");
+}
+
+export async function deleteTrainingType(formData: FormData) {
+  await requireAdmin();
+  try {
+    const id = String(formData.get("id") ?? "");
+    const type = await prisma.trainingType.findUnique({ where: { id } });
+    if (!type) throw new Error("That type is already gone.");
+    const [sessions, series] = await Promise.all([
+      prisma.trainingSession.count({ where: { typeId: id } }),
+      prisma.eventSeries.count({ where: { typeId: id } }),
+    ]);
+    if (sessions + series > 0) {
+      throw new Error("This type still has sessions. Remove was refused.");
+    }
+    await prisma.trainingType.delete({ where: { id } });
+  } catch (error) {
+    fail("/admin/types", error);
+  }
+  revalidatePath("/");
+  revalidatePath("/admin/types");
+  revalidatePath("/admin/schedule");
+  redirect("/admin/types");
+}
+
 export async function deleteCoach(formData: FormData) {
   await requireAdmin();
   try {
-    await deleteCoachLogin(String(formData.get("id") ?? ""));
+    await deleteCoachNamed(String(formData.get("coachName") ?? ""));
   } catch (error) {
     fail("/admin/coaches", error);
   }

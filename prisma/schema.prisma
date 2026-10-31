@@ -100,6 +100,8 @@ model EventSeries {
   skippedDays     String[]          @default([])
   kind            SessionKind
   program         String
+  typeId          String?
+  type            TrainingType?     @relation(fields: [typeId], references: [id], onDelete: Restrict)
   title           String
   coach           String?
   coaches         String[]          @default([])
@@ -121,6 +123,8 @@ model TrainingSession {
   seedKey         String?        @unique
   kind            SessionKind
   program         String
+  typeId          String?
+  type            TrainingType?  @relation(fields: [typeId], references: [id], onDelete: Restrict)
   title           String
   coach           String?
   coaches         String[]       @default([])
@@ -316,6 +320,22 @@ model StaffUser {
   days         CoachDay[]
 
   @@map("staff_users")
+}
+
+model TrainingType {
+  id           String            @id @default(cuid())
+  name         String            @unique
+  description  String            @default("")
+  nextStep     String            @default("Choose a coach")
+  offeringKey  String?           @unique
+  colorProgram String            @default("")
+  sortOrder    Int               @default(0)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  sessions     TrainingSession[]
+  series       EventSeries[]
+
+  @@map("training_types")
 }
 
 model CoachDay {

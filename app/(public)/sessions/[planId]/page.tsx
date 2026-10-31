@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-export default async function PlanPage({
+export default async function SessionOfferPage({
   params,
   searchParams,
 }: {
@@ -25,13 +25,13 @@ export default async function PlanPage({
 
   return (
     <div className="mx-auto max-w-lg px-4 py-8">
-      <Link href="/#plans" className="text-sm font-semibold text-primary">All plans</Link>
+      <Link href="/#sessions" className="text-sm font-semibold text-primary">All sessions</Link>
       <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-primary">{plan.program}</p>
       <h1 className="font-display text-4xl uppercase">{plan.name}</h1>
       <p className="mt-2 font-display text-4xl" data-plan-cadence={planCadence(plan.billingInterval)}>
         {formatMoney(plan.priceCents)} <span className="text-lg">{planCadence(plan.billingInterval)}</span>
       </p>
-      <p className="mt-2 text-sm">{plan.sessionsPerMonth} group {plan.program} sessions each billing period. Unused sessions do not roll over.</p>
+      <p className="mt-2 text-sm">{plan.sessionsPerMonth} group {plan.program} times each billing period. Unused times do not roll over.</p>
       {query.canceled ? <p className="mt-3 text-sm font-semibold">Checkout was canceled. You can try again.</p> : null}
       {waiver ? (
         <div className="mt-6">

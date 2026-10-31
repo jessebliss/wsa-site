@@ -132,7 +132,7 @@ async function main() {
     location: PARK,
     capacity: 16,
     priceCents: 4000,
-    description: "Drop in any session for $40, or use the monthly plan.",
+    description: "Drop in any time for $40, or use the monthly session.",
   };
   const patterns = [
     ["speed-thu", 4, "18:00", 60],
@@ -174,7 +174,7 @@ async function main() {
         priceCents,
         startsAt: slots[i],
         endsAt: addMinutes(slots[i], 60),
-        description: `Weekly quarterback training. ${priceLabel} per session, or the monthly plan when this email has sessions left.`,
+        description: `Weekly quarterback training. ${priceLabel} per time, or the monthly session when this email has times left.`,
       });
     }
   }

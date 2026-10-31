@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   }
   if (!stripeConfigured()) {
     return NextResponse.json(
-      { error: "Monthly plans bill through Stripe. Add a test secret key to start a subscription." },
+      { error: "Monthly sessions bill through Stripe. Add a test secret key to start a subscription." },
       { status: 503 },
     );
   }
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   try {
     const plan = await prisma.plan.findUnique({ where: { id: parsed.data.planId } });
     if (!plan || !plan.active) {
-      return NextResponse.json({ error: "That plan is not available." }, { status: 404 });
+      return NextResponse.json({ error: "That session is not available." }, { status: 404 });
     }
     const priced = await ensurePlanStripePrice(plan);
     const waiver = await prisma.waiver.findFirst({
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       mode: "subscription",
       customer_email: email,
       success_url: `${appUrl()}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl()}/plans/${plan.id}?canceled=1`,
+      cancel_url: `${appUrl()}/sessions/${plan.id}?canceled=1`,
       line_items: [{ price: priced.stripePriceId!, quantity: 1 }],
       metadata,
       subscription_data: { metadata },
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     if (!checkout.url) throw new Error("Stripe did not return a checkout link.");
     return NextResponse.json({ redirect: checkout.url });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not start the plan.";
+    const message = error instanceof Error ? error.message : "Could not start the session.";
     const status = error instanceof BookingError ? 400 : 502;
     return NextResponse.json({ error: message }, { status });
   }

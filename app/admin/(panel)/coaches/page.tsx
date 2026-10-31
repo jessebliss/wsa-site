@@ -65,21 +65,23 @@ export default async function CoachesPage({
               {coach.login ? <p className="text-sm text-muted-foreground">{coach.login.email}</p> : null}
               <p className="text-sm">Parents see {coach.coachName}</p>
             </Link>
-            {coach.login ? (
-              <ConfirmForm
-                action={deleteCoach}
-                message={`Delete ${coach.coachName}'s login, QR code, and saved availability? If an upcoming booking names only them, this is refused. Past attendance and payments stay.`}
+            <ConfirmForm
+              action={deleteCoach}
+              message={
+                coach.login
+                  ? `Delete ${coach.coachName}'s login, QR code, and saved availability? If an upcoming booking names only them, this is refused. Past attendance and payments stay.`
+                  : `Delete ${coach.coachName}? If an upcoming booking names only them, this is refused. Past attendance and payments stay.`
+              }
+            >
+              <input type="hidden" name="coachName" value={coach.coachName} />
+              <button
+                type="submit"
+                aria-label={`Delete ${coach.coachName}`}
+                className="flex h-11 w-11 items-center justify-center rounded-full text-primary"
               >
-                <input type="hidden" name="id" value={coach.login.id} />
-                <button
-                  type="submit"
-                  aria-label={`Delete ${coach.coachName}`}
-                  className="flex h-11 w-11 items-center justify-center rounded-full text-primary"
-                >
-                  <Trash2 aria-hidden="true" className="h-5 w-5" />
-                </button>
-              </ConfirmForm>
-            ) : null}
+                <Trash2 aria-hidden="true" className="h-5 w-5" />
+              </button>
+            </ConfirmForm>
           </li>
         ))}
       </ul>

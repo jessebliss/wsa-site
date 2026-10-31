@@ -22,11 +22,13 @@ export type { SessionFormValues };
 
 export function SessionForm({
   roster,
+  types,
   values,
   minMonth,
   maxMonth,
 }: {
   roster: string[];
+  types: { id: string; name: string }[];
   values: SessionFormValues;
   minMonth: string;
   maxMonth: string;
@@ -86,7 +88,7 @@ export function SessionForm({
       {values.id ? <input type="hidden" name="id" value={values.id} /> : null}
       <input type="hidden" name="scope" value={values.repeating ? scope : "this"} />
       <div>
-        <Label htmlFor="kind">Type</Label>
+        <Label htmlFor="kind">Group, camp, or private</Label>
         <select
           id="kind"
           name="kind"
@@ -100,13 +102,20 @@ export function SessionForm({
         </select>
       </div>
       <div>
-        <Label htmlFor="program">Program</Label>
-        <Input className="mt-1" id="program" name="program" list="programs" required defaultValue={values.program} placeholder="Quarterback Training" />
-        <datalist id="programs">
-          <option value="Quarterback Training" />
-          <option value="Speed & Agility" />
-          <option value="Girls Flag" />
-        </datalist>
+        <Label htmlFor="typeId">Type</Label>
+        <select
+          id="typeId"
+          name="typeId"
+          required
+          defaultValue={values.typeId}
+          className="mt-1 h-11 w-full rounded-md border border-border bg-white px-3"
+        >
+          <option value="">Choose</option>
+          {types.map((type) => (
+            <option key={type.id} value={type.id}>{type.name}</option>
+          ))}
+        </select>
+        {types.length === 0 ? <p className="mt-1 text-sm text-muted-foreground">Add a type before scheduling this.</p> : null}
       </div>
       <div className="sm:col-span-2">
         <Label htmlFor="title">Title</Label>
