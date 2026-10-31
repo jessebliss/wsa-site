@@ -267,7 +267,7 @@ export async function savePlan(formData: FormData) {
   try {
     const color = String(formData.get("color") ?? "");
     const billingValue = String(formData.get("billingInterval") ?? "MONTH");
-    if (!isEventColorId(color)) throw new Error("Choose one of the twelve colors.");
+    if (!isEventColorId(color)) throw new Error("Choose a color.");
     if (billingValue !== "MONTH" && billingValue !== "YEAR") throw new Error("Choose monthly or yearly.");
     const billingInterval: BillingInterval = billingValue === "YEAR" ? "YEAR" : "MONTH";
     const data = {

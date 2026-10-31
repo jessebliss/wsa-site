@@ -22,7 +22,7 @@ export default async function WaiverAdmin({
     <div>
       <h1 className="font-display text-4xl uppercase">Waiver</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        New signups accept the current text. Each acceptance stores the exact text that person agreed to.
+        New signups accept this text. People who already signed keep the wording they agreed to.
       </p>
       <AdminError message={params.error} />
       <form action={saveWaiver} className="mt-4 space-y-3">

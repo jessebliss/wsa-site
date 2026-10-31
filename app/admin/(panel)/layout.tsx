@@ -24,7 +24,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="min-h-screen">
       <div className="bg-ink text-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <p className="font-display text-xl uppercase">{coach ? "WSA coach" : "WSA admin"}</p>
+          <p className="font-display text-xl uppercase">{coach ? "Coach" : "Admin"}</p>
           <form action={logout}>
             <button className="text-sm font-semibold" type="submit">Log out</button>
           </form>

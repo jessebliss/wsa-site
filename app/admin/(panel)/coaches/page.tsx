@@ -75,7 +75,7 @@ export default async function CoachesPage({
     <div>
       <h1 className="font-display text-4xl uppercase">Coaches</h1>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-        These logins are for coaches. They set the days and hours parents can book. The academy admin login still runs the schedule, prices, plans, promos, waiver, rosters, and attendance.
+        A coach signs in to open the days and hours parents can book.
       </p>
       <AdminError message={params.error} />
       {params.saved ? <p className="mt-3 text-sm font-semibold text-primary">Saved. Parents see the new price.</p> : null}
@@ -174,7 +174,7 @@ export default async function CoachesPage({
           <li key={coach.id} className="rounded-xl bg-white p-4">
             <p className="font-semibold">{coach.name}</p>
             <p className="text-sm text-muted-foreground">{coach.email}</p>
-            <p className="text-sm">Schedule name: {coach.coachName}</p>
+            <p className="text-sm">Parents see {coach.coachName}</p>
             <ConfirmForm
               action={deleteCoach}
               className="mt-3"

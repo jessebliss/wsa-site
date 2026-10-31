@@ -549,7 +549,7 @@ export function PublicSchedule({
           </div>
         ) : null}
       </section>
-      {children}
+      {step === 1 ? children : null}
     </>
   );
 }

@@ -42,7 +42,7 @@ export default async function PlansAdmin({
     <div>
       <h1 className="font-display text-4xl uppercase">Plans and prices</h1>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-        A plan is monthly or yearly. Yearly is one charge per year. The color is one of twelve swatches, and sessions in that program use it on both calendars. Catalog changes apply to new checkouts. People already subscribed keep their price and session count until you edit that subscription.
+        Monthly or yearly. Yearly bills once a year. A price change applies to new signups. People already on a plan keep their price and included sessions until you change that membership.
       </p>
       <AdminError message={params.error} />
       <form action={savePlan} className="mt-4 grid gap-3 rounded-2xl bg-white p-4 sm:grid-cols-2">

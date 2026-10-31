@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { formatEt } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Messages" };
@@ -16,7 +17,7 @@ export default async function ContactsPage() {
             <p>{message.email} · {message.phone}</p>
             {message.subject ? <p className="mt-1 font-semibold">{message.subject}</p> : null}
             <p className="mt-1 whitespace-pre-wrap">{message.message}</p>
-            <p className="mt-2 text-xs text-muted-foreground">{message.createdAt.toISOString()}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{formatEt(message.createdAt, { month: "short", day: "numeric", year: "numeric" })}</p>
           </li>
         ))}
       </ul>

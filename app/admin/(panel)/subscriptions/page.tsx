@@ -58,7 +58,7 @@ export default async function SubscriptionsPage({
     <div>
       <h1 className="font-display text-4xl uppercase">Subscriptions</h1>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-        Stripe memberships are created when a parent checks out. Add a Venmo membership here when they pay outside Stripe. Canceling Venmo stops it in this app only.
+        Card memberships start when a parent checks out. Add a Venmo membership when they pay you directly. Canceling Venmo here does not refund a card.
       </p>
       <AdminError message={params.error} />
       <form action={createVenmoMembership} className="mt-4 grid gap-3 rounded-2xl bg-white p-4 sm:grid-cols-2">

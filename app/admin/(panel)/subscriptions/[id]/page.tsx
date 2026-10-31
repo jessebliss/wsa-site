@@ -9,7 +9,15 @@ import { centsToDollarInput, formatMoney } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { subscriptionPlanName } from "@/lib/subscription-admin";
 import { planCadence } from "@/lib/plan-options";
-import { formatEtDate } from "@/lib/time";
+import { formatEt, formatEtDate } from "@/lib/time";
+
+const STATUS_LABEL: Record<string, string> = {
+  ACTIVE: "Active",
+  CANCELED: "Canceled",
+  PAST_DUE: "Past due",
+  PAUSED: "Paused",
+  INCOMPLETE: "Incomplete",
+};
 
 export const dynamic = "force-dynamic";
 
@@ -35,31 +43,31 @@ export default async function SubscriptionDetail({
       <h1 className="mt-2 font-display text-4xl uppercase">{sub.playerName}</h1>
       <p className="text-sm">{sub.parentName} · {sub.email} · {sub.phone}</p>
       <p className="mt-2 text-sm font-semibold">
-        {sub.paymentMethod === "VENMO" ? "Venmo" : "Stripe"} · {sub.status}{sub.cancelAtPeriodEnd ? " · cancels at period end" : ""} · {formatMoney(sub.priceCents)} {planCadence(sub.plan?.billingInterval)}
+        {sub.paymentMethod === "VENMO" ? "Venmo" : "Stripe"} · {STATUS_LABEL[sub.status] ?? sub.status}{sub.cancelAtPeriodEnd ? " · will not renew" : ""} · {formatMoney(sub.priceCents)} {planCadence(sub.plan?.billingInterval)}
       </p>
       <p className="text-sm text-muted-foreground">
-        {subscriptionPlanName(sub)} · {sub.sessionsUsed} of {sub.sessionsIncluded} used
-        {sub.currentPeriodEnd ? ` · period ends ${formatEtDate(sub.currentPeriodEnd)}` : ""}
+        {subscriptionPlanName(sub)} · {sub.sessionsUsed} of {sub.sessionsIncluded} sessions used
+        {sub.currentPeriodEnd ? ` · through ${formatEtDate(sub.currentPeriodEnd)}` : ""}
       </p>
       {sub.note ? <p className="mt-2 text-sm">Note: {sub.note}</p> : null}
       {sub.status === "PAST_DUE" ? (
         <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-primary">Payment is past due.</p>
       ) : null}
       {sub.paymentMethod === "VENMO" ? (
-        <p className="mt-3 text-sm">This membership is marked Venmo. It was not created in Stripe. Canceling it stops it in this app only.</p>
+        <p className="mt-3 text-sm">This membership was paid by Venmo. Canceling it here does not refund a card.</p>
       ) : !sub.stripeSubscriptionId ? (
-        <p className="mt-3 text-sm">This record is not linked to Stripe, so billing changes are unavailable.</p>
+        <p className="mt-3 text-sm">This membership has no card on file, so the price and plan cannot be changed here.</p>
       ) : null}
       <AdminError message={query.error} />
       {sub.paymentMethod === "VENMO" ? (
         <div className="mt-6">
           {sub.status === "CANCELED" ? (
-            <p className="text-sm">This Venmo membership is canceled in this app.</p>
+            <p className="text-sm">This Venmo membership is canceled.</p>
           ) : (
             <form action={subscriptionAction} className="rounded-2xl bg-white p-4">
               <input type="hidden" name="id" value={sub.id} />
               <input type="hidden" name="action" value="cancel-now" />
-              <p className="text-sm text-muted-foreground">This does not cancel anyone in Stripe.</p>
+              <p className="text-sm text-muted-foreground">This does not refund a card.</p>
               <Button className="mt-3 w-full" type="submit" variant="outline">Cancel Venmo subscription</Button>
             </form>
           )}
@@ -70,7 +78,7 @@ export default async function SubscriptionDetail({
           <input type="hidden" name="id" value={sub.id} />
           <input type="hidden" name="action" value="plan" />
           <Label htmlFor="planId">Change plan</Label>
-          <p className="text-xs text-muted-foreground">Stripe prorates the difference and invoices it now. This person moves to the new plan&apos;s price and session count.</p>
+          <p className="text-xs text-muted-foreground">The difference is billed now. This person moves to the new plan&apos;s price and session count.</p>
           <select id="planId" name="planId" className="mt-2 h-11 w-full rounded-md border border-border px-3" defaultValue={sub.planId ?? ""}>
             {plans.map((plan) => (
               <option key={plan.id} value={plan.id}>{plan.name} · {formatMoney(plan.priceCents)} {planCadence(plan.billingInterval)} · {plan.sessionsPerMonth} sessions</option>
@@ -82,7 +90,7 @@ export default async function SubscriptionDetail({
           <input type="hidden" name="id" value={sub.id} />
           <input type="hidden" name="action" value="price" />
           <Label htmlFor="price">Custom price</Label>
-          <p className="text-xs text-muted-foreground">Only this person. The catalog price stays the same. Stripe prorates the change.</p>
+          <p className="text-xs text-muted-foreground">Only this person. The plan price for everyone else stays the same, and the difference is billed now.</p>
           <Input className="mt-2" id="price" name="price" defaultValue={centsToDollarInput(sub.priceCents)} />
           <Button className="mt-3 w-full" type="submit" variant="outline">Set custom price</Button>
         </form>
@@ -112,7 +120,7 @@ export default async function SubscriptionDetail({
       )}
       {sub.waiverAcceptance ? (
         <details className="mt-6 rounded-xl bg-white p-4 text-sm">
-          <summary className="cursor-pointer font-semibold">Waiver accepted {sub.waiverAcceptance.acceptedAt.toISOString()}</summary>
+          <summary className="cursor-pointer font-semibold">Waiver accepted {formatEt(sub.waiverAcceptance.acceptedAt, { month: "short", day: "numeric", year: "numeric" })}</summary>
           <pre className="mt-3 whitespace-pre-wrap font-sans">{sub.waiverAcceptance.waiverText}</pre>
         </details>
       ) : null}

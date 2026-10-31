@@ -22,7 +22,7 @@ export default async function FeesPage({
     <div>
       <h1 className="font-display text-4xl uppercase">Fees</h1>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-        Registration and tax are added at checkout on one-time payments. A promo lowers the session price first. Registration is a fixed amount plus a percent of that price. Tax is a fixed amount plus a percent of the price and registration together. Monthly plans are not changed. Leave a field blank or at zero to skip it.
+        Registration and tax are added at checkout on one-time payments. A promo lowers the session price first. Registration is a fixed amount plus a percent of that price. Tax is a fixed amount plus a percent of the price and registration together. Memberships are not changed. Leave a field blank or at zero to skip it.
       </p>
       <AdminError message={params.error} />
       {params.saved === "1" ? <p className="mt-3 text-sm font-semibold text-primary">Saved.</p> : null}

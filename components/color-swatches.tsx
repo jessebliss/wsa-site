@@ -4,9 +4,6 @@ export function ColorSwatches({ value }: { value: string }) {
   return (
     <fieldset className="sm:col-span-2">
       <legend className="text-sm font-semibold">Color</legend>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Twelve colors. This program uses the color on the admin calendar and the parent calendar. Canceled events are that color, faded.
-      </p>
       <div className="mt-2 flex flex-wrap gap-2" data-color-swatches="yes">
         {EVENT_COLORS.map((color) => (
           <label key={color.id} className="cursor-pointer" title={color.label}>

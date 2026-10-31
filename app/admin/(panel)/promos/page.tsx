@@ -19,7 +19,7 @@ export default async function PromosPage({
   return (
     <div>
       <h1 className="font-display text-4xl uppercase">Promo codes</h1>
-      <p className="mt-2 text-sm text-muted-foreground">One-time bookings only: camps, group drop-ins, private lessons, and QB introduction sessions. Memberships are not discounted. Checkout already has the code field.</p>
+      <p className="mt-2 text-sm text-muted-foreground">Parents can use a code on a camp, a group drop-in, a private lesson, or a QB introduction. Memberships are not discounted.</p>
       <AdminError message={params.error} />
       <form action={savePromo} className="mt-4 grid gap-3 rounded-2xl bg-white p-4">
         <div>

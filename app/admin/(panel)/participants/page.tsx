@@ -1,8 +1,34 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatMoney } from "@/lib/money";
-import { formatEtDate } from "@/lib/time";
+import { formatEt, formatEtDate } from "@/lib/time";
 import { normalizeEmail } from "@/lib/utils";
+
+function acceptedOn(date: Date) {
+  return formatEt(date, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function membershipStatus(status: string) {
+  const labels: Record<string, string> = {
+    ACTIVE: "Active",
+    CANCELED: "Canceled",
+    PAST_DUE: "Past due",
+    PAUSED: "Paused",
+    INCOMPLETE: "Incomplete",
+  };
+  return labels[status] ?? status;
+}
+
+function paymentLabel(status: string) {
+  const labels: Record<string, string> = {
+    PENDING: "Pending",
+    PAID: "Paid",
+    REFUNDED: "Refunded",
+    FAILED: "Failed",
+    EXPIRED: "Expired",
+  };
+  return labels[status] ?? status;
+}
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Participants" };
@@ -38,16 +64,16 @@ export default async function ParticipantsPage({
         <input name="email" defaultValue={email} placeholder="Filter by email" className="h-11 flex-1 rounded-md border border-border px-3" />
         <button className="h-11 rounded-md bg-ink px-4 text-sm font-semibold text-white" type="submit">Find</button>
       </form>
-      <h2 className="mt-6 font-display text-2xl uppercase">Monthly plans</h2>
+      <h2 className="mt-6 font-display text-2xl uppercase">Plans</h2>
       <ul className="mt-2 space-y-2">
         {subscriptions.length === 0 ? <li className="text-sm text-muted-foreground">No plan signups yet.</li> : null}
         {subscriptions.map((row) => (
           <li key={row.id} className="rounded-xl bg-white p-4 text-sm">
             <p className="font-semibold">{row.playerName} · {row.parentName}</p>
             <p>{row.email} · {row.phone}</p>
-            <p>{row.plan?.name || row.planName || "Deleted plan"} · {formatMoney(row.priceCents)} · {row.status}</p>
+            <p>{row.plan?.name || row.planName || "Deleted plan"} · {formatMoney(row.priceCents)} · {membershipStatus(row.status)}</p>
             <p className="text-muted-foreground">
-              Waiver {row.waiverAcceptance ? `accepted ${row.waiverAcceptance.acceptedAt.toISOString()}` : "not stored"}
+              {row.waiverAcceptance ? `Waiver accepted ${acceptedOn(row.waiverAcceptance.acceptedAt)}` : "No waiver on file"}
             </p>
           </li>
         ))}
@@ -65,9 +91,9 @@ export default async function ParticipantsPage({
               ) : (
                 <span className="font-semibold">QB Introduction Session</span>
               )}
-              {" · "}{row.session ? formatEtDate(row.session.startsAt) : "Not scheduled"} · {formatMoney(row.amountCents)} · {row.paymentStatus}
+              {" · "}{row.session ? formatEtDate(row.session.startsAt) : "Not scheduled"} · {formatMoney(row.amountCents)} · {paymentLabel(row.paymentStatus)}
             </p>
-            <p className="text-muted-foreground">Waiver accepted {row.waiverAcceptance.acceptedAt.toISOString()}</p>
+            <p className="text-muted-foreground">Waiver accepted {acceptedOn(row.waiverAcceptance.acceptedAt)}</p>
           </li>
         ))}
       </ul>
