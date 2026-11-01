@@ -8,6 +8,7 @@ import { listedSessionPrice } from "@/lib/private-quarterback-data";
 import { formatMoney } from "@/lib/money";
 import { coachAllowsSession } from "@/lib/openings";
 import { prisma } from "@/lib/prisma";
+import { isPlaceholderCoach, isPlaceholderOnly } from "@/lib/schedule-filter";
 import { formatEtLong } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export default async function SessionCheckoutPage({
 }) {
   const { sessionId } = await params;
   const session = await prisma.trainingSession.findUnique({ where: { id: sessionId } });
-  if (!session || session.status !== "SCHEDULED") notFound();
+  if (!session || session.status !== "SCHEDULED" || isPlaceholderOnly(session)) notFound();
   const taken = await countOccupied(session.id);
   const spotsLeft = session.capacity - taken;
   const coachOpen = await coachAllowsSession(session);
@@ -38,7 +39,7 @@ export default async function SessionCheckoutPage({
       <h1 className="font-display text-4xl uppercase">{session.title}</h1>
       <p className="mt-2 text-sm">{formatEtLong(session.startsAt)} ET</p>
       <p className="text-sm text-muted-foreground">{session.location}</p>
-      {session.coach ? <p className="text-sm">{session.coach}</p> : null}
+      {session.coach && !isPlaceholderCoach(session.coach) ? <p className="text-sm">{session.coach}</p> : null}
       {session.description ? <p className="mt-3 text-sm leading-relaxed">{session.description}</p> : null}
       <p className="mt-3 text-sm font-semibold">
         {spotsLeft <= 0 ? "Sold out" : `${spotsLeft} spot${spotsLeft === 1 ? "" : "s"} left`} · {formatMoney(listPrice)}

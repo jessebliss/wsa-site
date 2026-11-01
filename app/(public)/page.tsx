@@ -7,7 +7,7 @@ import { planCadence } from "@/lib/plan-options";
 import { loadOpenings } from "@/lib/openings";
 import { PRIVATE_QUARTERBACK_KEY, SPEED_PROGRAM, isPrivateQuarterback, matchCoachName } from "@/lib/private-quarterback";
 import { loadPrivateQuarterbackPrices, loadSavedPrivatePrices, loadSavedSpeedPrices, privateQuarterbackCoachNames } from "@/lib/private-quarterback-data";
-import { sessionCoachNames } from "@/lib/schedule-filter";
+import { isPlaceholderCoach, parentCoachNames } from "@/lib/schedule-filter";
 import { etDayKey, etToUtc, shiftMonth } from "@/lib/time";
 import { ensureTrainingTypes, loadTrainingTypes } from "@/lib/training-types";
 import { PlanDisclosure } from "@/components/plan-disclosure";
@@ -45,31 +45,35 @@ export default async function SchedulePage({
   ]);
   const retiredNames = new Set(retired.map((row) => row.coachName));
   const counts = await occupiedCounts(sessions.map((session) => session.id));
+  const publicOpenings = Object.fromEntries(
+    Object.entries(openings).filter(([name]) => !isPlaceholderCoach(name)),
+  );
   const privateCoachNames = privateQuarterbackCoachNames(
     sessions
       .filter((session) => {
-        if (!session.coach || !isPrivateQuarterback(session)) return false;
+        if (!session.coach || isPlaceholderCoach(session.coach) || !isPrivateQuarterback(session)) return false;
         return session.capacity - (counts.get(session.id) ?? 0) > 0;
       })
       .map((session) => session.coach as string),
   );
-  for (const name of Object.keys(openings)) {
+  for (const name of Object.keys(publicOpenings)) {
     if (!privateCoachNames.includes(name)) privateCoachNames.push(name);
   }
   const speedCoachNames = Array.from(
     new Set(
       sessions
         .filter((session) => session.program === SPEED_PROGRAM)
-        .flatMap((session) => sessionCoachNames(session)),
+        .flatMap((session) => parentCoachNames(session)),
     ),
   );
   const wantsSpeed = query.training === "speed";
   const wantsQuarterback = query.training === "quarterback";
-  const linkedCoach = wantsQuarterback
+  const requestedCoach = wantsQuarterback
     ? matchCoachName(query.coach ?? "", privateCoachNames)
     : wantsSpeed
       ? matchCoachName(query.coach ?? "", speedCoachNames)
       : "";
+  const linkedCoach = isPlaceholderCoach(requestedCoach) ? "" : requestedCoach;
   if (wantsQuarterback && linkedCoach && !privateCoachNames.includes(linkedCoach)) privateCoachNames.push(linkedCoach);
   for (let index = privateCoachNames.length - 1; index >= 0; index -= 1) {
     if (retiredNames.has(privateCoachNames[index])) privateCoachNames.splice(index, 1);
@@ -95,7 +99,7 @@ export default async function SchedulePage({
         todayKey={todayKey}
         currentMonth={currentMonth}
         maxMonth={maxMonth}
-        openings={openings}
+        openings={publicOpenings}
         portraits={Object.fromEntries(coaches.map((coach) => [coach.name, coach.photo]))}
         nowIso={new Date().toISOString()}
         initialTypeId={initialTypeId}

@@ -1,5 +1,7 @@
 import { hoursCoveredBySession } from "@/lib/availability";
+import { isIntro } from "@/lib/intro";
 import { prisma } from "@/lib/prisma";
+import { isPlaceholderOnly } from "@/lib/schedule-filter";
 import { etDayKey } from "@/lib/time";
 import { normalizeEmail } from "@/lib/utils";
 import type { PromoCode, TrainingSession } from "@prisma/client";
@@ -65,6 +67,7 @@ async function assertCoachOpen(session: TrainingSession, tx: typeof prisma) {
 
 async function assertBookable(session: TrainingSession, email: string, now: Date, tx: typeof prisma) {
   if (session.status !== "SCHEDULED") throw new BookingError("This session is not available.");
+  if (!isIntro(session) && isPlaceholderOnly(session)) throw new BookingError("This session is not available.");
   if (session.startsAt.getTime() <= now.getTime()) {
     throw new BookingError("This session has already started.");
   }

@@ -11,6 +11,7 @@ import {
 } from "@/lib/private-quarterback";
 import { loadPrivateQuarterbackPrices, privateLessonLocation } from "@/lib/private-quarterback-data";
 import { prisma } from "@/lib/prisma";
+import { isPlaceholderCoach } from "@/lib/schedule-filter";
 import { etDayKey, shiftMonth } from "@/lib/time";
 
 function sameTime(left: Date, right: Date) {
@@ -90,6 +91,7 @@ async function ensurePrivateQuarterbackHour(coach: string, dayKey: string, hour:
 
 export async function bookPrivateQuarterbackHour(formData: FormData) {
   const coach = String(formData.get("coach") ?? "").trim();
+  if (isPlaceholderCoach(coach)) redirect("/");
   const dayKey = String(formData.get("day") ?? "");
   const hour = Number(formData.get("hour"));
   let id: string | null = null;

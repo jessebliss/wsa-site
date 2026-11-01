@@ -9,6 +9,7 @@ import { dollarsToCents, optionalDollarsToCents } from "@/lib/money";
 import { isEventColorId } from "@/lib/plan-options";
 import { percentToBps } from "@/lib/fees";
 import { prisma } from "@/lib/prisma";
+import { isPlaceholderCoach } from "@/lib/schedule-filter";
 import { type RepeatRule } from "@/lib/recurrence";
 import { cancelEvent, createEvent, deleteEvent, updateEvent, type EventInput, type EventScope } from "@/lib/series";
 import { getStripe, stripeConfigured } from "@/lib/stripe";
@@ -192,16 +193,18 @@ async function readEvent(formData: FormData): Promise<EventInput> {
   const coaches = formData
     .getAll("coaches")
     .map((value) => String(value).trim())
-    .filter(Boolean);
+    .filter((name) => name && !isPlaceholderCoach(name));
   const typeId = String(formData.get("typeId") ?? "").trim();
   const type = typeId ? await prisma.trainingType.findUnique({ where: { id: typeId } }) : null;
   if (!type) throw new Error("Choose a type.");
+  const coachName = String(formData.get("coach") ?? "").trim();
+  if (kind !== "GROUP" && isPlaceholderCoach(coachName)) throw new Error("Choose a coach.");
   return {
     kind,
     typeId: type.id,
     program: type.colorProgram || type.name,
     title: String(formData.get("title") ?? "").trim(),
-    coach: kind === "GROUP" ? null : String(formData.get("coach") ?? "").trim() || null,
+    coach: kind === "GROUP" ? null : coachName || null,
     coaches: kind === "GROUP" ? Array.from(new Set(coaches)) : [],
     description: String(formData.get("description") ?? "").trim() || null,
     location: String(formData.get("location") ?? "").trim(),

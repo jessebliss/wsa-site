@@ -1,5 +1,6 @@
 import { QUARTERBACK_COACHES } from "@/lib/private-quarterback";
 import { prisma } from "@/lib/prisma";
+import { isPlaceholderCoach } from "@/lib/schedule-filter";
 
 /** Coaches a new group session is placed on. Named quarterback coaches first, then anyone else on the schedule. */
 export async function loadCoachRoster() {
@@ -11,12 +12,12 @@ export async function loadCoachRoster() {
   const gone = new Set(retired.map((row) => row.coachName));
   const names = new Set<string>(QUARTERBACK_COACHES.filter((name) => !gone.has(name)));
   for (const person of staff) {
-    if (!gone.has(person.coachName)) names.add(person.coachName);
+    if (!gone.has(person.coachName) && !isPlaceholderCoach(person.coachName)) names.add(person.coachName);
   }
   for (const session of sessions) {
-    if (session.coach && !gone.has(session.coach)) names.add(session.coach);
+    if (session.coach && !gone.has(session.coach) && !isPlaceholderCoach(session.coach)) names.add(session.coach);
     for (const coach of session.coaches) {
-      if (!gone.has(coach)) names.add(coach);
+      if (!gone.has(coach) && !isPlaceholderCoach(coach)) names.add(coach);
     }
   }
   const order = QUARTERBACK_COACHES as readonly string[];

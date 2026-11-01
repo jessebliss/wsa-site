@@ -1,7 +1,7 @@
 import { QUARTERBACK_COACHES, QUARTERBACK_PROGRAM, SPEED_PROGRAM } from "@/lib/private-quarterback";
 import { loadPrivateQuarterbackPrices } from "@/lib/private-quarterback-data";
 import { prisma } from "@/lib/prisma";
-import { sessionCoachNames } from "@/lib/schedule-filter";
+import { isPlaceholderCoach, parentCoachNames } from "@/lib/schedule-filter";
 import { privateBookingPath, publicOrigin } from "@/lib/site-origin";
 
 export type CoachLogin = {
@@ -54,7 +54,7 @@ export async function loadCoachDirectory() {
   );
   const latestSpeedCents = new Map<string, number>();
   for (const session of pricedSessions) {
-    const names = sessionCoachNames(session);
+    const names = parentCoachNames(session);
     if (session.program === SPEED_PROGRAM) {
       for (const name of names) {
         speedNames.add(name);
@@ -79,7 +79,7 @@ export async function loadCoachDirectory() {
     if (!ordered.includes(name)) ordered.push(name);
   }
 
-  const entries: CoachDirectoryEntry[] = ordered.filter((coachName) => !retiredNames.has(coachName)).map((coachName) => {
+  const entries: CoachDirectoryEntry[] = ordered.filter((coachName) => !retiredNames.has(coachName) && !isPlaceholderCoach(coachName)).map((coachName) => {
     const login = logins.get(coachName);
     const saved = savedByName.get(coachName);
     const offersPrivate = privateNames.has(coachName);

@@ -1,5 +1,6 @@
 import { Prisma, type EventSeries, type TrainingSession } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { isPlaceholderCoach } from "@/lib/schedule-filter";
 import { assertRule, defaultRule, occurrenceDays, type RepeatRule } from "@/lib/recurrence";
 import { etDayKey, etToUtc, addDays } from "@/lib/time";
 
@@ -219,7 +220,7 @@ function inputFromSeries(series: EventSeries): EventInput {
     typeId: series.typeId,
     title: series.title,
     coach: series.coach,
-    coaches: series.coaches,
+    coaches: series.coaches.filter((name) => !isPlaceholderCoach(name)),
     description: series.description,
     location: series.location,
     date: series.anchorDay,

@@ -20,7 +20,7 @@ import {
   type PrivateHourSession,
 } from "@/lib/private-quarterback";
 import { colorForProgram, type PlanColorSource } from "@/lib/plan-options";
-import { openSessions, sessionCoachNames } from "@/lib/schedule-filter";
+import { isPlaceholderCoach, openSessions, parentCoachNames } from "@/lib/schedule-filter";
 import { dayKeysForMonth, etDayKey, etToUtc, formatEt, formatEtTime } from "@/lib/time";
 
 export type ScheduleSession = {
@@ -71,7 +71,7 @@ function sessionBlock(session: ScheduleSession, plans: PlanColorSource[]): Calen
     when: `${formatEtTime(start)}–${formatEtTime(end)} ET`,
     startsAt: session.startsAt,
     program: session.program,
-    coaches: sessionCoachNames(session).join(", "),
+    coaches: parentCoachNames(session).join(", "),
     location: session.location,
     color: color.hex,
     colorId: color.id,
@@ -191,9 +191,10 @@ export function PublicSchedule({
   types?: { id: string; name: string; description: string; nextStep: string; offeringKey: string | null; sortOrder: number }[];
   children?: ReactNode;
 }) {
-  const [step, setStep] = useState<1 | 2 | 3>(initialStep);
+  const startingCoach = isPlaceholderCoach(initialCoach) ? "" : initialCoach;
+  const [step, setStep] = useState<1 | 2 | 3>(startingCoach ? initialStep : 1);
   const [offeringId, setOfferingId] = useState(initialTypeId);
-  const [coach, setCoach] = useState(initialCoach);
+  const [coach, setCoach] = useState(startingCoach);
   const [showGroups, setShowGroups] = useState(false);
   const [groupMonth, setGroupMonth] = useState(currentMonth);
   const [groupDay, setGroupDay] = useState("");
@@ -239,7 +240,7 @@ export function PublicSchedule({
     const prices = new Map<string, number[]>();
     for (const session of bookable) {
       if (session.typeId !== offeringId) continue;
-      for (const name of sessionCoachNames(session)) {
+      for (const name of parentCoachNames(session)) {
         const list = prices.get(name) ?? [];
         const speed = speedOffering ? speedPrices[name] : undefined;
         list.push(speed ?? session.priceCents);
@@ -258,7 +259,7 @@ export function PublicSchedule({
   const privateBooking = offering?.offeringKey === PRIVATE_QUARTERBACK_KEY;
   const usesAvailability = privateBooking && coachHasLogin(openings, coach);
   const onThisCoach = (session: ScheduleSession) =>
-    session.typeId === offeringId && sessionCoachNames(session).includes(coach);
+    session.typeId === offeringId && parentCoachNames(session).includes(coach);
   const chosen = bookable.filter(onThisCoach);
   const canceledChosen = sessions.filter((session) => session.status === "CANCELED" && onThisCoach(session));
   const privatePrice = privateCoaches.find((person) => person.name === coach)?.priceCents ?? 0;
@@ -304,6 +305,7 @@ export function PublicSchedule({
   }
 
   function pickCoach(name: string) {
+    if (isPlaceholderCoach(name)) return;
     if (name !== coach) {
       setDay("");
       setMonth(currentMonth);
@@ -330,7 +332,7 @@ export function PublicSchedule({
   const groupBlocks = useMemo<CalendarBlock[]>(() => {
     return sessions
       .filter((session) => {
-        if (session.kind !== "GROUP" || isIntro(session) || sessionCoachNames(session).length === 0) return false;
+        if (session.kind !== "GROUP" || isIntro(session) || parentCoachNames(session).length === 0) return false;
         return !scopedTraining || session.typeId === scopedTraining;
       })
       .map((session) => sessionBlock(session, plans));
@@ -342,7 +344,7 @@ export function PublicSchedule({
         if (isIntro(session)) return false;
         if (session.kind !== "GROUP" && session.kind !== "PRIVATE" && session.kind !== "CAMP") return false;
         if (offeringId && session.typeId !== offeringId) return false;
-        return sessionCoachNames(session).includes(coach);
+        return parentCoachNames(session).includes(coach);
       })
       .map((session) => {
         const block = sessionBlock(session, plans);

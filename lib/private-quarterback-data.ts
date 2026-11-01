@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { sessionCoachNames } from "@/lib/schedule-filter";
+import { isPlaceholderCoach, parentCoachNames } from "@/lib/schedule-filter";
 import {
   PRIVATE_LESSON_LOCATION,
   QUARTERBACK_COACHES,
@@ -77,7 +77,7 @@ export async function listedSessionPrice(session: {
     if (row?.privateQuarterbackCents != null) return row.privateQuarterbackCents;
   }
   if (session.program === SPEED_PROGRAM) {
-    const names = sessionCoachNames(session);
+    const names = parentCoachNames(session);
     if (names.length > 0) {
       const rows = await prisma.coachPrice.findMany({
         where: { coachName: { in: names }, speedCents: { not: null } },
@@ -92,7 +92,7 @@ export async function listedSessionPrice(session: {
 export function privateQuarterbackCoachNames(extraCoaches: string[]) {
   const names = [...QUARTERBACK_COACHES] as string[];
   for (const coach of extraCoaches) {
-    if (coach && !names.includes(coach)) names.push(coach);
+    if (coach && !isPlaceholderCoach(coach) && !names.includes(coach)) names.push(coach);
   }
   return names;
 }

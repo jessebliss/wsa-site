@@ -53,6 +53,20 @@ export function sessionCoachNames(session: { kind: string; coach: string | null;
   return session.coach ? [session.coach] : [];
 }
 
+/** "Staff" is a leftover schedule label, not a person parents can book. */
+export function isPlaceholderCoach(name: string) {
+  return name.trim().toLowerCase() === "staff";
+}
+
+export function parentCoachNames(session: { kind: string; coach: string | null; coaches?: string[] | null }) {
+  return sessionCoachNames(session).filter((name) => !isPlaceholderCoach(name));
+}
+
+export function isPlaceholderOnly(session: { kind: string; coach: string | null; coaches?: string[] | null }) {
+  const names = sessionCoachNames(session);
+  return names.length > 0 && names.every((name) => isPlaceholderCoach(name));
+}
+
 export function openSessions<
   T extends OfferingSession & {
     coach: string | null;
@@ -67,7 +81,8 @@ export function openSessions<
     if (session.status === "CANCELED") return false;
     if (isIntro(session)) return false;
     if (session.spotsLeft <= 0) return false;
-    if (session.kind === "GROUP") return sessionCoachNames(session).length > 0;
+    if (isPlaceholderOnly(session)) return false;
+    if (session.kind === "GROUP") return parentCoachNames(session).length > 0;
     return sessionWithinOpening(session, openings);
   });
 }
