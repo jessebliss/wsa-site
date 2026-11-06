@@ -1,16 +1,15 @@
-import Link from "next/link";
 import { coaches } from "@/lib/content";
 import { prisma } from "@/lib/prisma";
 import { occupiedCounts } from "@/lib/booking";
 import { formatMoney } from "@/lib/money";
-import { planCadence } from "@/lib/plan-options";
+import { planCadence, planIsUnlimited } from "@/lib/plan-options";
+import { ensureLandingPlans } from "@/lib/landing-plans";
 import { loadOpenings } from "@/lib/openings";
 import { PRIVATE_QUARTERBACK_KEY, SPEED_PROGRAM, isPrivateQuarterback, matchCoachName } from "@/lib/private-quarterback";
 import { loadPrivateQuarterbackPrices, loadSavedPrivatePrices, loadSavedSpeedPrices, privateQuarterbackCoachNames } from "@/lib/private-quarterback-data";
 import { isPlaceholderCoach, parentCoachNames } from "@/lib/schedule-filter";
 import { etDayKey, etToUtc, shiftMonth } from "@/lib/time";
 import { ensureTrainingTypes, loadTrainingTypes } from "@/lib/training-types";
-import { PlanDisclosure } from "@/components/plan-disclosure";
 import { PublicSchedule } from "@/components/public-schedule";
 import { extendSeriesHorizon } from "@/lib/series";
 
@@ -20,12 +19,13 @@ export const metadata = { title: "Schedule" };
 export default async function SchedulePage({
   searchParams,
 }: {
-  searchParams: Promise<{ training?: string; coach?: string }>;
+  searchParams: Promise<{ training?: string; coach?: string; start?: string }>;
 }) {
   const query = await searchParams;
   const todayKey = etDayKey(new Date());
   await extendSeriesHorizon(todayKey);
   await ensureTrainingTypes();
+  const landingRows = await ensureLandingPlans();
   const currentMonth = todayKey.slice(0, 7);
   const maxMonth = shiftMonth(currentMonth, 5);
   const rangeStart = etToUtc(todayKey, "00:00");
@@ -92,7 +92,7 @@ export default async function SchedulePage({
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Book a session</p>
       <h1 className="font-display text-5xl uppercase">Schedule</h1>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-        Times are Eastern. Choose a training, then a coach and a day.
+        Times are Eastern. New quarterbacks start with the introduction. Existing clients pick a training.
       </p>
 
       <PublicSchedule
@@ -104,7 +104,29 @@ export default async function SchedulePage({
         nowIso={new Date().toISOString()}
         initialTypeId={initialTypeId}
         initialCoach={linkedCoach}
-        initialStep={linkedCoach ? 3 : 1}
+        initialStage={
+          linkedCoach
+            ? "home"
+            : query.start === "new"
+              ? "intro"
+              : query.start === "new-coach"
+                ? "intro-coach"
+                : query.start === "existing"
+                  ? "trainings"
+                  : "home"
+        }
+        landingPlans={landingRows.map((plan) => ({
+          id: plan.id,
+          name: plan.name,
+          priceLabel: formatMoney(plan.priceCents),
+          cadence: planCadence(plan.billingInterval),
+          yearly: plan.billingInterval === "YEAR",
+          detail: planIsUnlimited(plan.sessionsPerMonth)
+            ? plan.billingInterval === "YEAR"
+              ? "Unlimited group times. One charge per year."
+              : "Unlimited group times each month."
+            : `${plan.sessionsPerMonth} group times each month.`,
+        }))}
         speedPrices={speedPrices}
         savedPrivatePrices={savedPrivatePrices}
         plans={plans.map((plan) => ({
@@ -138,29 +160,7 @@ export default async function SchedulePage({
           priceCents: session.priceCents,
           location: session.location,
         }))}
-      >
-        <PlanDisclosure>
-          <p className="max-w-2xl text-sm text-muted-foreground">
-            Each session includes group times in that program, billed monthly or once a year. Unused times do not roll over. Camps and private lessons are not included.
-          </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {plans.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Sessions will show here once the academy publishes them.</p>
-            ) : (
-              plans.map((plan) => (
-                <Link key={plan.id} href={`/sessions/${plan.id}`} className="rounded-2xl bg-white p-5">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">{plan.program}</p>
-                  <h3 className="font-display text-3xl uppercase">{plan.name}</h3>
-                  <p className="mt-2 font-display text-4xl" data-plan-cadence={planCadence(plan.billingInterval)}>
-                    {formatMoney(plan.priceCents)}<span className="text-base"> {planCadence(plan.billingInterval)}</span>
-                  </p>
-                  <p className="mt-1 text-sm">{plan.sessionsPerMonth} group times {plan.billingInterval === "YEAR" ? "each year" : "each month"}</p>
-                </Link>
-              ))
-            )}
-          </div>
-        </PlanDisclosure>
-      </PublicSchedule>
+      />
     </div>
   );
 }

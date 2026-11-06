@@ -85,6 +85,13 @@ export default async function ParticipantsPage({
           <li key={row.id} className="rounded-xl bg-white p-4 text-sm">
             <p className="font-semibold">{row.playerName} · {row.parentName}</p>
             <p>{row.email} · {row.phone}</p>
+            {row.school || row.grade || row.social || row.coachName ? (
+              <p>
+                {[row.coachName ? `Coach ${row.coachName}` : "", row.school, row.grade ? `Grade ${row.grade}` : "", row.social]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            ) : null}
             <p>
               {row.session && row.sessionId ? (
                 <Link className="font-semibold" href={`/admin/schedule/${row.sessionId}/roster`}>{row.session.title}</Link>

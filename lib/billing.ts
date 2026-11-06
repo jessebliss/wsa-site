@@ -293,8 +293,12 @@ async function sendSubscriptionReceipt(subscriptionId: string) {
       `Parent: ${sub.parentName}`,
       `Session: ${sub.plan?.name || sub.planName || "Membership"}`,
       `Amount: ${formatMoney(sub.priceCents)} ${sub.plan?.billingInterval === "YEAR" ? "per year" : "per month"}`,
-      `Group sessions this period: ${sub.sessionsIncluded}`,
-      "Unused sessions expire at the end of the billing period and do not roll over.",
+      sub.sessionsIncluded <= 0
+        ? "Group times on this membership do not run out."
+        : `Group sessions this period: ${sub.sessionsIncluded}`,
+      sub.sessionsIncluded <= 0
+        ? ""
+        : "Unused sessions expire at the end of the billing period and do not roll over.",
       "Camps and private lessons are paid separately.",
       "",
       portal ? `Update your card or cancel: ${portal}` : "Contact the academy to update the card on file.",

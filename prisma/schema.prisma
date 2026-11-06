@@ -220,6 +220,10 @@ model Registration {
   parentName              String
   phone                   String
   playerName              String
+  school                  String?
+  grade                   String?
+  social                  String?
+  coachName               String?
   kind                    RegistrationKind
   paymentStatus           PaymentStatus    @default(PENDING)
   amountCents             Int

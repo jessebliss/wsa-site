@@ -15,7 +15,9 @@ import { loadCheckoutFees } from "@/lib/fees-data";
 import { INTRO_CHECKOUT_ID, INTRO_LABEL, INTRO_PRICE_CENTS } from "@/lib/intro";
 import { listedSessionPrice } from "@/lib/private-quarterback-data";
 import { coachAllowsSession } from "@/lib/openings";
-import { personSchema, zodMessage } from "@/lib/validators";
+import { isPlaceholderCoach } from "@/lib/schedule-filter";
+import { introPersonSchema, personSchema, zodMessage } from "@/lib/validators";
+import { loadIntroCoachNames } from "@/lib/private-quarterback-data";
 import { prisma } from "@/lib/prisma";
 import { getStripe, stripeConfigured } from "@/lib/stripe";
 import { appUrl } from "@/lib/utils";
@@ -173,8 +175,23 @@ export async function POST(request: Request) {
 
   try {
     if (input.sessionId === INTRO_CHECKOUT_ID) {
+      const introParsed = introPersonSchema.safeParse(payload);
+      if (!introParsed.success) {
+        return NextResponse.json({ error: zodMessage(introParsed.error) }, { status: 400 });
+      }
+      if (isPlaceholderCoach(introParsed.data.coachName)) {
+        return NextResponse.json({ error: "Choose a coach." }, { status: 400 });
+      }
+      const coaches = await loadIntroCoachNames();
+      const coachName = coaches.find((name) => name.toLowerCase() === introParsed.data.coachName.toLowerCase());
+      if (!coachName) return NextResponse.json({ error: "Choose a coach." }, { status: 400 });
       const priced = await priceIntro(input.promoCode);
-      const held = await holdIntro(person, priced.promo, priced.charge);
+      const held = await holdIntro(person, priced.promo, priced.charge, {
+        school: introParsed.data.school,
+        grade: introParsed.data.grade,
+        social: introParsed.data.social,
+        coachName,
+      });
       if (priced.charge.totalCents === 0) {
         await prisma.registration.update({
           where: { id: held.registration.id },

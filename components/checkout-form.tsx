@@ -9,18 +9,24 @@ import { formatMoney } from "@/lib/money";
 
 export type CheckoutLine = { label: string; cents: number };
 
+const GRADES = ["K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "College"];
+
 export function CheckoutForm({
   sessionId,
   priceCents,
   lines,
   waiver,
   allowPromo,
+  intake = "session",
+  coachName = "",
 }: {
   sessionId: string;
   priceCents: number;
   lines: CheckoutLine[];
   waiver: string;
   allowPromo: boolean;
+  intake?: "session" | "intro";
+  coachName?: string;
 }) {
   const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState("");
@@ -73,10 +79,14 @@ export function CheckoutForm({
       body: JSON.stringify({
         intent: "book",
         sessionId,
-        parentName: data.get("parentName"),
+        parentName: intake === "intro" ? data.get("name") : data.get("parentName"),
         email: data.get("email"),
         phone: data.get("phone"),
-        playerName: data.get("playerName"),
+        playerName: intake === "intro" ? data.get("name") : data.get("playerName"),
+        school: data.get("school"),
+        grade: data.get("grade"),
+        social: data.get("social"),
+        coachName: data.get("coachName"),
         promoCode: data.get("promoCode"),
         acceptWaiver: accepted,
       }),
@@ -107,23 +117,60 @@ export function CheckoutForm({
         ) : null}
         <p className="text-sm text-white/80">{priceNote}</p>
       </div>
-      <div>
-        <Label htmlFor="parentName">Parent name</Label>
-        <Input className="mt-1" id="parentName" name="parentName" required autoComplete="name" />
-      </div>
-      <div>
-        <Label htmlFor="email">Email</Label>
-        <Input className="mt-1" id="email" name="email" type="email" required autoComplete="email" onBlur={(event) => quote(event.currentTarget.form!)} />
-      </div>
-      <div>
-        <Label htmlFor="phone">Phone</Label>
-        <Input className="mt-1" id="phone" name="phone" type="tel" inputMode="tel" required autoComplete="tel" />
-      </div>
-      <div>
-        <Label htmlFor="playerName">Player name</Label>
-        <Input className="mt-1" id="playerName" name="playerName" required />
-        <p className="mt-1 text-xs text-muted-foreground">One player per signup. A sibling is a second signup.</p>
-      </div>
+      {intake === "intro" ? (
+        <>
+          <input type="hidden" name="coachName" value={coachName} />
+          <div>
+            <Label htmlFor="name">Name</Label>
+            <Input className="mt-1" id="name" name="name" required autoComplete="name" />
+          </div>
+          <div>
+            <Label htmlFor="phone">Phone</Label>
+            <Input className="mt-1" id="phone" name="phone" type="tel" inputMode="tel" required autoComplete="tel" />
+          </div>
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input className="mt-1" id="email" name="email" type="email" required autoComplete="email" onBlur={(event) => quote(event.currentTarget.form!)} />
+          </div>
+          <div>
+            <Label htmlFor="school">School</Label>
+            <Input className="mt-1" id="school" name="school" required />
+          </div>
+          <div>
+            <Label htmlFor="grade">Grade</Label>
+            <select id="grade" name="grade" required defaultValue="" className="mt-1 h-11 w-full rounded-md border border-border bg-white px-3">
+              <option value="">Choose</option>
+              {GRADES.map((grade) => (
+                <option key={grade} value={grade}>{grade}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Label htmlFor="social">Social</Label>
+            <Input className="mt-1" id="social" name="social" required placeholder="@instagram" />
+          </div>
+        </>
+      ) : (
+        <>
+          <div>
+            <Label htmlFor="parentName">Parent name</Label>
+            <Input className="mt-1" id="parentName" name="parentName" required autoComplete="name" />
+          </div>
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input className="mt-1" id="email" name="email" type="email" required autoComplete="email" onBlur={(event) => quote(event.currentTarget.form!)} />
+          </div>
+          <div>
+            <Label htmlFor="phone">Phone</Label>
+            <Input className="mt-1" id="phone" name="phone" type="tel" inputMode="tel" required autoComplete="tel" />
+          </div>
+          <div>
+            <Label htmlFor="playerName">Player name</Label>
+            <Input className="mt-1" id="playerName" name="playerName" required />
+            <p className="mt-1 text-xs text-muted-foreground">One player per signup. A sibling is a second signup.</p>
+          </div>
+        </>
+      )}
       {allowPromo ? (
         <div>
           <Label htmlFor="promoCode">Promo code (optional)</Label>

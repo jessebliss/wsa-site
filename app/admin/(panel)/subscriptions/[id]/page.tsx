@@ -46,7 +46,7 @@ export default async function SubscriptionDetail({
         {sub.paymentMethod === "VENMO" ? "Venmo" : "Stripe"} · {STATUS_LABEL[sub.status] ?? sub.status}{sub.cancelAtPeriodEnd ? " · will not renew" : ""} · {formatMoney(sub.priceCents)} {planCadence(sub.plan?.billingInterval)}
       </p>
       <p className="text-sm text-muted-foreground">
-        {subscriptionPlanName(sub)} · {sub.sessionsUsed} of {sub.sessionsIncluded} times used
+        {subscriptionPlanName(sub)} · {sub.sessionsIncluded <= 0 ? "Unlimited" : `${sub.sessionsUsed} of ${sub.sessionsIncluded} times used`}
         {sub.currentPeriodEnd ? ` · through ${formatEtDate(sub.currentPeriodEnd)}` : ""}
       </p>
       {sub.note ? <p className="mt-2 text-sm">Note: {sub.note}</p> : null}

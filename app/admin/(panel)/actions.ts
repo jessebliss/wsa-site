@@ -297,8 +297,8 @@ export async function savePlan(formData: FormData) {
       sortOrder: Number(formData.get("sortOrder") ?? 0) || 0,
     };
     if (!data.name) throw new Error("Name is required.");
-    if (!Number.isInteger(data.sessionsPerMonth) || data.sessionsPerMonth < 1) {
-      throw new Error("Times included has to be at least 1.");
+    if (!Number.isInteger(data.sessionsPerMonth) || data.sessionsPerMonth < 0) {
+      throw new Error("Times included has to be 0 or more. 0 means unlimited.");
     }
     const plan = id
       ? await prisma.plan.update({ where: { id }, data })

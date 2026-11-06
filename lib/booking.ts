@@ -22,6 +22,18 @@ export type PersonInput = {
   playerName: string;
 };
 
+export type IntroIntake = {
+  school: string;
+  grade: string;
+  social: string;
+  coachName: string;
+};
+
+function membershipCovers(sessionsIncluded: number, sessionsUsed: number) {
+  if (sessionsIncluded <= 0) return true;
+  return sessionsUsed < sessionsIncluded;
+}
+
 function occupiedWhere(now: Date) {
   return {
     OR: [
@@ -98,7 +110,7 @@ export async function findCoveringSubscription(email: string, program: string, n
     if (!sub.plan?.active) return false;
     if (sub.plan.program !== program) return false;
     if (sub.currentPeriodEnd && sub.currentPeriodEnd.getTime() < now.getTime()) return false;
-    return sub.sessionsUsed < sub.sessionsIncluded;
+    return membershipCovers(sub.sessionsIncluded, sub.sessionsUsed);
   });
   matches.sort((a, b) => b.sessionsIncluded - b.sessionsUsed - (a.sessionsIncluded - a.sessionsUsed));
   return matches[0] ?? null;
@@ -133,13 +145,16 @@ export async function previewCredit(emailRaw: string, sessionId: string) {
       message: "No active session with times left for this program. This booking is a one-time payment.",
     };
   }
+  const unlimited = sub.sessionsIncluded <= 0;
   const left = sub.sessionsIncluded - sub.sessionsUsed;
   return {
     covered: true as const,
     priceCents: 0,
     planName: plan.name,
     sessionsLeft: left,
-    message: `Covered by ${plan.name}. ${left} time${left === 1 ? "" : "s"} left this period.`,
+    message: unlimited
+      ? `Covered by ${plan.name}. Group times on this membership do not run out.`
+      : `Covered by ${plan.name}. ${left} time${left === 1 ? "" : "s"} left this period.`,
   };
 }
 
@@ -163,7 +178,7 @@ export async function bookWithPlanCredit(sessionId: string, person: PersonInput)
           item.plan?.active &&
           item.plan.program === session.program &&
           (!item.currentPeriodEnd || item.currentPeriodEnd.getTime() >= now.getTime()) &&
-          item.sessionsUsed < item.sessionsIncluded,
+          membershipCovers(item.sessionsIncluded, item.sessionsUsed),
       )
       .sort((a, b) => b.sessionsIncluded - b.sessionsUsed - (a.sessionsIncluded - a.sessionsUsed))[0];
 
@@ -173,7 +188,7 @@ export async function bookWithPlanCredit(sessionId: string, person: PersonInput)
       where: {
         id: sub.id,
         status: "ACTIVE",
-        sessionsUsed: { lt: sub.sessionsIncluded },
+        ...(sub.sessionsIncluded <= 0 ? {} : { sessionsUsed: { lt: sub.sessionsIncluded } }),
       },
       data: { sessionsUsed: { increment: 1 } },
     });
@@ -214,6 +229,7 @@ export async function holdIntro(
   person: PersonInput,
   promo: PromoCode | null,
   charge: { totalCents: number; registrationCents: number; taxCents: number },
+  intake: IntroIntake,
 ) {
   const email = normalizeEmail(person.email);
   const now = new Date();
@@ -238,6 +254,10 @@ export async function holdIntro(
       parentName: person.parentName,
       phone: person.phone,
       playerName: person.playerName,
+      school: intake.school,
+      grade: intake.grade,
+      social: intake.social,
+      coachName: intake.coachName,
       kind: "ONE_TIME",
       paymentStatus: "PENDING",
       amountCents: charge.totalCents,

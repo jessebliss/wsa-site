@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { centsToDollarInput, formatMoney } from "@/lib/money";
-import { eventColor, planCadence } from "@/lib/plan-options";
+import { eventColor, planCadence, planIsUnlimited } from "@/lib/plan-options";
 import { prisma } from "@/lib/prisma";
 import { ensureTrainingTypes, loadTrainingTypes } from "@/lib/training-types";
 
@@ -93,7 +93,8 @@ export default async function SessionsAdmin({
         <TypeChoice id="typeId" types={types} />
         <div>
           <Label htmlFor="sessionsPerMonth">Times included</Label>
-          <Input className="mt-1" id="sessionsPerMonth" name="sessionsPerMonth" type="number" min={1} required />
+          <Input className="mt-1" id="sessionsPerMonth" name="sessionsPerMonth" type="number" min={0} required />
+          <p className="mt-1 text-sm text-muted-foreground">Use 0 for unlimited.</p>
         </div>
         <div>
           <Label htmlFor="price">Price (USD)</Label>
@@ -114,14 +115,14 @@ export default async function SessionsAdmin({
           <li key={plan.id} className="rounded-2xl bg-white p-4">
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <i className="h-3 w-3 rounded-sm" style={{ backgroundColor: eventColor(plan.color).hex }} aria-hidden="true" />
-              {plan.active ? "Active" : "Hidden"} · {formatMoney(plan.priceCents)} {planCadence(plan.billingInterval)} · {plan.sessionsPerMonth} times
+              {plan.active ? "Active" : "Hidden"} · {formatMoney(plan.priceCents)} {planCadence(plan.billingInterval)} · {planIsUnlimited(plan.sessionsPerMonth) ? "Unlimited" : `${plan.sessionsPerMonth} times`}
             </p>
             <form action={savePlan} className="mt-3 grid gap-3 sm:grid-cols-2">
               <input type="hidden" name="id" value={plan.id} />
               <input type="hidden" name="sortOrder" value={plan.sortOrder} />
               <Input name="name" defaultValue={plan.name} required aria-label="Name" />
               <TypeChoice id={`type-${plan.id}`} types={types} value={plan.typeId ?? ""} />
-              <Input name="sessionsPerMonth" type="number" min={1} defaultValue={plan.sessionsPerMonth} required aria-label="Times included" />
+              <Input name="sessionsPerMonth" type="number" min={0} defaultValue={plan.sessionsPerMonth} required aria-label="Times included" />
               <Input name="price" defaultValue={centsToDollarInput(plan.priceCents)} required aria-label="Price" />
               <BillingChoice yearly={plan.billingInterval === "YEAR"} />
               <PlanColor value={plan.color} />

@@ -13,7 +13,7 @@ export default async function ConfirmedPage({
 }) {
   const { registration: id } = await searchParams;
   const registration = id
-    ? await prisma.registration.findUnique({ where: { id }, include: { session: true } })
+    ? await prisma.registration.findUnique({ where: { id }, include: { session: true, subscription: true } })
     : null;
 
   return (
@@ -28,10 +28,17 @@ export default async function ConfirmedPage({
               <p className="mt-1 text-sm text-muted-foreground">{registration.session.location}</p>
             </>
           ) : (
-            <p className="mt-1 text-sm">{INTRO_NOTE} This session is not on the calendar.</p>
+            <p className="mt-1 text-sm">
+              {INTRO_NOTE} This session is not on the calendar.
+              {registration.coachName ? ` Coach: ${registration.coachName}.` : ""}
+            </p>
           )}
           {registration.kind === "PLAN_CREDIT" ? (
-            <p className="mt-4 text-sm">This time is covered by the monthly session on {registration.email}. One time was used.</p>
+            <p className="mt-4 text-sm">
+              {registration.subscription && registration.subscription.sessionsIncluded <= 0
+                ? `This time is covered by the membership on ${registration.email}.`
+                : `This time is covered by the monthly session on ${registration.email}. One time was used.`}
+            </p>
           ) : (
             <p className="mt-4 text-sm">Payment status: {registration.paymentStatus}.</p>
           )}

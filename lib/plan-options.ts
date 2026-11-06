@@ -65,3 +65,8 @@ export function colorForProgram(program: string, plans: PlanColorSource[]) {
 export function planCadence(interval: string | null | undefined) {
   return interval === "YEAR" ? "per year" : "per month";
 }
+
+/** Zero included times means the membership does not run out. */
+export function planIsUnlimited(sessions: number | null | undefined) {
+  return (sessions ?? 0) <= 0;
+}

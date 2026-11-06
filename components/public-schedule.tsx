@@ -1,17 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { bookPrivateQuarterbackHour } from "@/app/(public)/private-lesson";
 import { CalendarLegend, legendItems } from "@/components/calendar-legend";
 import { DayEventsPanel } from "@/components/day-events";
 import { MonthCalendar, type CalendarBlock } from "@/components/month-calendar";
 import { type OpeningsByCoach } from "@/lib/availability";
-import { INTRO_KEY, INTRO_LABEL, INTRO_NOTE, INTRO_PRICE_CENTS, isIntro } from "@/lib/intro";
+import { INTRO_NOTE, INTRO_PRICE_CENTS, isIntro } from "@/lib/intro";
 import { formatMoney } from "@/lib/money";
 import {
   PRIVATE_QUARTERBACK_KEY,
+  QUARTERBACK_PROGRAM,
   coachHasLogin,
   SPEED_PROGRAM,
   isPrivateQuarterback,
@@ -153,6 +154,45 @@ function PrivateHourForm({
     </form>
   );
 }
+export type LandingPlanCard = {
+  id: string;
+  name: string;
+  priceLabel: string;
+  cadence: string;
+  detail: string;
+  yearly: boolean;
+};
+
+type ScheduleType = { id: string; name: string; description: string; nextStep: string; offeringKey: string | null; sortOrder: number };
+type PathKey = "intro" | "private" | "group" | "flag" | "film" | "speed";
+type Stage = "home" | "intro" | "trainings" | "coach" | "calendar";
+
+const TRAININGS: { key: Exclude<PathKey, "intro">; label: string; description: string }[] = [
+  { key: "private", label: "Private quarterback", description: "One-on-one quarterback training. You choose the coach and the time." },
+  { key: "group", label: "Group quarterback", description: "Group quarterback on the schedule." },
+  { key: "flag", label: "Girls flag", description: "Girls flag with the academy coaches." },
+  { key: "film", label: "Film study", description: "Film on the academy calendar." },
+  { key: "speed", label: "Speed & Agility", description: "Speed and agility with the academy coaches." },
+];
+
+function pathMatchesType(type: ScheduleType, key: Exclude<PathKey, "intro">) {
+  const name = type.name;
+  const offering = type.offeringKey ?? "";
+  if (key === "private") return offering === PRIVATE_QUARTERBACK_KEY;
+  if (key === "group") return offering === `program:${QUARTERBACK_PROGRAM}`;
+  if (key === "speed") return offering === `program:${SPEED_PROGRAM}` || /speed/i.test(name);
+  if (key === "flag") return /flag/i.test(name) || /flag/i.test(offering);
+  return /film/i.test(name) || /film/i.test(offering);
+}
+
+function sessionOnPath(session: ScheduleSession, key: Exclude<PathKey, "intro">, typeId: string) {
+  if (typeId) return session.typeId === typeId;
+  if (key === "private") return isPrivateQuarterback(session);
+  if (key === "group") return session.kind === "GROUP" && session.program === QUARTERBACK_PROGRAM && !isIntro(session);
+  if (key === "speed") return session.program === SPEED_PROGRAM;
+  if (key === "flag") return /flag/i.test(session.program);
+  return /film/i.test(session.program);
+}
 
 export function PublicSchedule({
   sessions,
@@ -165,12 +205,12 @@ export function PublicSchedule({
   nowIso,
   initialTypeId = "",
   initialCoach = "",
-  initialStep = 1,
+  initialStage = "home",
   speedPrices = {},
   savedPrivatePrices = {},
   plans = [],
   types = [],
-  children,
+  landingPlans = [],
 }: {
   sessions: ScheduleSession[];
   todayKey: string;
@@ -182,67 +222,48 @@ export function PublicSchedule({
   nowIso: string;
   initialTypeId?: string;
   initialCoach?: string;
-  initialStep?: 1 | 2 | 3;
-  /** Saved public speed prices, keyed by coach. Missing means the session price. */
+  initialStage?: "home" | "intro" | "intro-coach" | "trainings";
   speedPrices?: Record<string, number>;
-  /** Saved private quarterback prices. Missing means the lesson keeps its own price. */
   savedPrivatePrices?: Record<string, number>;
   plans?: PlanColorSource[];
-  types?: { id: string; name: string; description: string; nextStep: string; offeringKey: string | null; sortOrder: number }[];
-  children?: ReactNode;
+  types?: ScheduleType[];
+  landingPlans?: LandingPlanCard[];
 }) {
   const startingCoach = isPlaceholderCoach(initialCoach) ? "" : initialCoach;
-  const [step, setStep] = useState<1 | 2 | 3>(startingCoach ? initialStep : 1);
-  const [offeringId, setOfferingId] = useState(initialTypeId);
+  const linkedPath: PathKey = (() => {
+    const type = types.find((item) => item.id === initialTypeId);
+    if (!type) return "group";
+    const found = TRAININGS.find((item) => pathMatchesType(type, item.key));
+    return found?.key ?? "group";
+  })();
+  const opened: Stage = startingCoach
+    ? "calendar"
+    : initialStage === "intro-coach"
+      ? "coach"
+      : initialStage === "intro"
+        ? "intro"
+        : initialStage === "trainings"
+          ? "trainings"
+          : "home";
+  const [stage, setStage] = useState<Stage>(opened);
+  const [path, setPath] = useState<PathKey>(startingCoach ? linkedPath : opened === "coach" || opened === "intro" ? "intro" : "group");
   const [coach, setCoach] = useState(startingCoach);
-  const [showGroups, setShowGroups] = useState(false);
-  const [groupMonth, setGroupMonth] = useState(currentMonth);
-  const [groupDay, setGroupDay] = useState("");
   const [month, setMonth] = useState(currentMonth);
   const [day, setDay] = useState("");
 
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const bookable = useMemo(() => openSessions(sessions, openings), [sessions, openings]);
-  const offerings = useMemo(() => {
-    const rows = types
-      .filter((type) => {
-        if (type.offeringKey === INTRO_KEY) return true;
-        if (type.offeringKey === PRIVATE_QUARTERBACK_KEY && privateCoaches.length > 0) return true;
-        return bookable.some((session) => session.typeId === type.id);
-      })
-      .map((type) => ({
-        id: type.id,
-        label: type.name,
-        description: type.description,
-        next: type.nextStep || "Choose a coach",
-        href: type.offeringKey === INTRO_KEY ? "/book/intro" : "",
-        offeringKey: type.offeringKey,
-        sortOrder: type.sortOrder,
-      }));
-    if (!rows.some((row) => row.href === "/book/intro")) {
-      rows.push({
-        id: INTRO_KEY,
-        label: INTRO_LABEL,
-        description: INTRO_NOTE,
-        next: "Continue to checkout",
-        href: "/book/intro",
-        offeringKey: INTRO_KEY,
-        sortOrder: 2,
-      });
-    }
-    return rows.sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label));
-  }, [types, bookable, privateCoaches.length]);
-
-  const offering = offerings.find((item) => item.id === offeringId);
-  const speedOffering = offering?.offeringKey === `program:${SPEED_PROGRAM}`;
-  const coachesForOffering = useMemo(() => {
+  const activePath = path === "intro" ? null : path;
+  const activeTypeId = activePath ? types.find((type) => pathMatchesType(type, activePath))?.id ?? "" : "";
+  const coachesForPath = useMemo(() => {
+    if (!activePath) return [];
     const order = Object.keys(portraits);
     const prices = new Map<string, number[]>();
     for (const session of bookable) {
-      if (session.typeId !== offeringId) continue;
+      if (!sessionOnPath(session, activePath, activeTypeId)) continue;
       for (const name of parentCoachNames(session)) {
         const list = prices.get(name) ?? [];
-        const speed = speedOffering ? speedPrices[name] : undefined;
+        const speed = activePath === "speed" ? speedPrices[name] : undefined;
         list.push(speed ?? session.priceCents);
         prices.set(name, list);
       }
@@ -254,12 +275,12 @@ export function PublicSchedule({
         const bi = order.indexOf(b.name);
         return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi) || a.name.localeCompare(b.name);
       });
-  }, [bookable, offeringId, portraits, speedPrices, speedOffering]);
+  }, [activePath, activeTypeId, bookable, portraits, speedPrices]);
 
-  const privateBooking = offering?.offeringKey === PRIVATE_QUARTERBACK_KEY;
+  const privateBooking = path === "private";
   const usesAvailability = privateBooking && coachHasLogin(openings, coach);
   const onThisCoach = (session: ScheduleSession) =>
-    session.typeId === offeringId && parentCoachNames(session).includes(coach);
+    activePath != null && sessionOnPath(session, activePath, activeTypeId) && parentCoachNames(session).includes(coach);
   const chosen = bookable.filter(onThisCoach);
   const canceledChosen = sessions.filter((session) => session.status === "CANCELED" && onThisCoach(session));
   const privatePrice = privateCoaches.find((person) => person.name === coach)?.priceCents ?? 0;
@@ -293,64 +314,91 @@ export function PublicSchedule({
     });
   }, [usesAvailability, day, coach, openings, sessions, now]);
 
-  function pickOffering(id: string) {
-    if (id !== offeringId) {
+  function pickTraining(next: Exclude<PathKey, "intro">) {
+    if (next !== path) {
       setCoach("");
       setDay("");
       setMonth(currentMonth);
     }
-    setGroupDay("");
-    setOfferingId(id);
-    setStep(2);
+    setPath(next);
+    setStage("coach");
   }
 
   function pickCoach(name: string) {
     if (isPlaceholderCoach(name)) return;
+    if (path === "intro") {
+      window.location.assign(`/book/intro?coach=${encodeURIComponent(name)}`);
+      return;
+    }
     if (name !== coach) {
       setDay("");
       setMonth(currentMonth);
     }
     setCoach(name);
-    setShowGroups(false);
-    setStep(3);
+    setStage("calendar");
   }
 
   function back() {
     setDay("");
-    if (step === 3) setStep(2);
-    else {
-      setGroupDay("");
-      setStep(1);
-    }
+    if (stage === "calendar") setStage("coach");
+    else if (stage === "coach") setStage(path === "intro" ? "intro" : "trainings");
+    else setStage("home");
   }
 
   const question =
-    step === 1 ? "Choose your training" : step === 2 ? "Choose your coach" : day ? "Choose a time" : coach ? `${possessive(coach)} calendar` : "Choose a day";
-  const trail = offering && step > 1 ? offering.label : "";
+    stage === "home"
+      ? "Start here"
+      : stage === "intro"
+        ? "Introduction session"
+        : stage === "trainings"
+          ? "Choose a training"
+          : stage === "coach"
+            ? "Choose your coach"
+            : day
+              ? "Choose a time"
+              : coach
+                ? `${possessive(coach)} calendar`
+                : "Choose a day";
+  const trail =
+    stage === "coach" || stage === "calendar"
+      ? path === "intro"
+        ? "Introduction session"
+        : TRAININGS.find((item) => item.key === path)?.label ?? ""
+      : "";
+  const progress =
+    stage === "home"
+      ? ""
+      : path === "intro"
+        ? stage === "intro"
+          ? "1 of 2"
+          : "2 of 2"
+        : stage === "trainings"
+          ? "1 of 3"
+          : stage === "coach"
+            ? "2 of 3"
+            : "3 of 3";
   const coachPhoto = portraits[coach] ?? "";
-  const scopedTraining = step > 1 ? offeringId : "";
-  const groupBlocks = useMemo<CalendarBlock[]>(() => {
-    return sessions
-      .filter((session) => {
-        if (session.kind !== "GROUP" || isIntro(session) || parentCoachNames(session).length === 0) return false;
-        return !scopedTraining || session.typeId === scopedTraining;
-      })
-      .map((session) => sessionBlock(session, plans));
-  }, [sessions, scopedTraining, plans]);
+  const introCoaches = privateCoaches.map((person) => ({
+    name: person.name,
+    price: formatMoney(INTRO_PRICE_CENTS),
+    photo: portraits[person.name] ?? "",
+  }));
+  const coachCards = path === "intro" ? introCoaches : privateBooking
+    ? privateCoaches.map((person) => ({ name: person.name, price: formatMoney(person.priceCents), photo: portraits[person.name] ?? "" }))
+    : coachesForPath;
   const coachBlocks = useMemo<CalendarBlock[]>(() => {
-    if (!coach) return [];
+    if (!coach || path === "intro") return [];
     return sessions
       .filter((session) => {
         if (isIntro(session)) return false;
         if (session.kind !== "GROUP" && session.kind !== "PRIVATE" && session.kind !== "CAMP") return false;
-        if (offeringId && session.typeId !== offeringId) return false;
-        return parentCoachNames(session).includes(coach);
+        return onThisCoach(session);
       })
       .map((session) => {
         const block = sessionBlock(session, plans);
         if (session.status === "CANCELED") return block;
         const price =
-          session.program === SPEED_PROGRAM && speedPrices[coach] != null
+          path === "speed" && speedPrices[coach] != null
             ? speedPrices[coach]
             : isPrivateQuarterback(session) && savedPrivatePrices[coach] != null
               ? savedPrivatePrices[coach]
@@ -361,216 +409,191 @@ export function PublicSchedule({
           note: `${formatMoney(price)} · ${spots} spot${spots === 1 ? "" : "s"} left`,
         };
       });
-  }, [sessions, coach, offeringId, plans, speedPrices, savedPrivatePrices]);
+  }, [sessions, coach, path, plans, speedPrices, savedPrivatePrices, onThisCoach]);
   const openHourIds = new Set(dayHours.flatMap((slot) => (slot.sessionId ? [slot.sessionId] : [])));
   const dayExtras = coachBlocks.filter((event) => event.dayKey === day && !openHourIds.has(event.id));
+  const cardClass = "flex min-h-44 flex-col rounded-2xl bg-white px-5 py-5 text-left";
 
   return (
-    <>
-      <section id="schedule" className="mt-6 scroll-mt-24" data-step={step}>
-        <div className="flex items-end justify-between gap-3">
-          <h2 className="font-display text-4xl uppercase leading-none">{question}</h2>
-          <p className="text-sm text-muted-foreground">{step} of 3</p>
+    <section id="schedule" className="mt-6 scroll-mt-24" data-step={stage}>
+      <div className="flex items-end justify-between gap-3">
+        <h2 className="font-display text-4xl uppercase leading-none">{question}</h2>
+        {progress ? <p className="text-sm text-muted-foreground">{progress}</p> : null}
+      </div>
+      {trail ? <p className="mt-2 text-sm text-muted-foreground">{trail}</p> : null}
+      {stage !== "home" ? (
+        <button
+          type="button"
+          onClick={back}
+          className="mt-3 inline-flex min-h-12 items-center rounded-full bg-ink px-5 text-base font-semibold text-white"
+        >
+          Back
+        </button>
+      ) : null}
+      {stage === "calendar" && coach ? (
+        <div data-selected-coach={coach} className="mt-4 flex items-center gap-4 rounded-2xl border-2 border-primary bg-white p-4">
+          {coachPhoto ? (
+            <img src={coachPhoto} alt="" className="h-16 w-16 shrink-0 rounded-full object-cover object-top" />
+          ) : (
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-muted font-display text-xl">
+              {initials(coach)}
+            </span>
+          )}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Selected coach</p>
+            <p className="font-display text-3xl uppercase leading-none">{coach}</p>
+            <p className="mt-1 text-sm">You&apos;re on {possessive(coach)} calendar.</p>
+          </div>
         </div>
-        {trail ? <p className="mt-2 text-sm text-muted-foreground">{trail}</p> : null}
-        {step > 1 ? (
+      ) : null}
+
+      {stage === "home" ? (
+        <>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <button type="button" data-choice="new" onClick={() => { setPath("intro"); setStage("intro"); }} className={cardClass}>
+              <span className="block font-display text-3xl uppercase leading-none">New quarterback</span>
+              <span className="mt-3 block text-sm leading-snug text-muted-foreground">
+                Start with the introduction session. {formatMoney(INTRO_PRICE_CENTS)}.
+              </span>
+              <span className="mt-4 block text-sm font-semibold text-primary">Introduction session</span>
+            </button>
+            <button type="button" data-choice="existing" onClick={() => setStage("trainings")} className={cardClass}>
+              <span className="block font-display text-3xl uppercase leading-none">Existing client</span>
+              <span className="mt-3 block text-sm leading-snug text-muted-foreground">
+                Pick the training you already do, then a coach and a time.
+              </span>
+              <span className="mt-4 block text-sm font-semibold text-primary">Choose a training</span>
+            </button>
+          </div>
+          <div id="plans" className="mt-8 scroll-mt-24">
+            <div id="sessions" />
+            <h2 className="font-display text-4xl uppercase leading-none">Plans</h2>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {landingPlans.map((plan) => (
+                <Link
+                  key={plan.id}
+                  href={`/sessions/${plan.id}`}
+                  data-plan={plan.name}
+                  data-yearly={plan.yearly ? "yes" : undefined}
+                  className={cardClass}
+                >
+                  <span className="block font-display text-3xl uppercase leading-none">{plan.name}</span>
+                  <span className="mt-3 block font-display text-4xl leading-none">
+                    {plan.priceLabel}<span className="text-base"> {plan.cadence}</span>
+                  </span>
+                  <span className="mt-3 block text-sm leading-snug text-muted-foreground">{plan.detail}</span>
+                  <span className="mt-4 block text-sm font-semibold text-primary">Continue to checkout</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : null}
+
+      {stage === "intro" ? (
+        <div className="mt-4 rounded-2xl bg-white p-5" data-intro="yes">
+          <p className="font-display text-3xl uppercase leading-none">Introduction session</p>
+          <p className="mt-3 text-sm leading-snug text-muted-foreground">{INTRO_NOTE}</p>
+          <p className="mt-3 text-sm font-semibold">{formatMoney(INTRO_PRICE_CENTS)}</p>
           <button
             type="button"
-            onClick={back}
-            className="mt-3 inline-flex min-h-12 items-center rounded-full bg-ink px-5 text-base font-semibold text-white"
+            className="mt-4 text-sm font-semibold text-primary"
+            onClick={() => { setPath("intro"); setStage("coach"); }}
           >
-            Back
+            Choose a coach
           </button>
-        ) : null}
-        {step === 3 && coach ? (
-          <div data-selected-coach={coach} className="mt-4 flex items-center gap-4 rounded-2xl border-2 border-primary bg-white p-4">
-            {coachPhoto ? (
-              <img src={coachPhoto} alt="" className="h-16 w-16 shrink-0 rounded-full object-cover object-top" />
-            ) : (
-              <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-muted font-display text-xl">
-                {initials(coach)}
-              </span>
-            )}
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Selected coach</p>
-              <p className="font-display text-3xl uppercase leading-none">{coach}</p>
-              <p className="mt-1 text-sm">You&apos;re on {possessive(coach)} calendar.</p>
-            </div>
-          </div>
-        ) : null}
-        {step === 1 ? (
-          offerings.length === 0 ? (
-            <p className="mt-4 rounded-2xl bg-white p-5 text-sm text-muted-foreground">
-              Nothing is open on the schedule right now. Call 727-744-6880 and the academy will post the next session.
-            </p>
-          ) : (
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {offerings.map((item) => {
-                const body = (
-                  <>
-                    <span className="block font-display text-3xl uppercase leading-none">{item.label}</span>
-                    {item.description ? (
-                      <span className="mt-3 block text-sm leading-snug text-muted-foreground">
-                        {item.description}
-                        {item.href === "/book/intro" ? ` ${formatMoney(INTRO_PRICE_CENTS)}.` : ""}
-                      </span>
-                    ) : null}
-                    <span className="mt-4 block text-sm font-semibold text-primary">{item.next}</span>
-                  </>
-                );
-                const className = "flex min-h-44 flex-col rounded-2xl bg-white px-5 py-5 text-left";
-                return item.href ? (
-                  <Link key={item.id} href={item.href} data-offering={item.label} data-next={item.next} className={className}>
-                    {body}
-                  </Link>
-                ) : (
-                  <button
-                    key={item.id}
-                    type="button"
-                    data-offering={item.label}
-                    data-type={item.id}
-                    data-next={item.next}
-                    onClick={() => pickOffering(item.id)}
-                    className={className}
-                  >
-                    {body}
-                  </button>
-                );
-              })}
-            </div>
-          )
-        ) : null}
+        </div>
+      ) : null}
 
-        {step === 2 && coachesForOffering.length === 0 && !privateBooking ? (
-          <p className="mt-4 rounded-2xl bg-white p-5 text-sm text-muted-foreground">None are on the calendar yet.</p>
-        ) : null}
-
-        {step === 2 && (privateBooking || coachesForOffering.length > 0) ? (
-          <div className="mt-4 grid gap-3">
-            {(privateBooking ? privateCoaches.map((person) => ({
-              name: person.name,
-              price: formatMoney(person.priceCents),
-              photo: portraits[person.name] ?? "",
-            })) : coachesForOffering).map((person) => (
-              <button
-                key={person.name}
-                type="button"
-                data-coach={person.name}
-                data-price={person.price}
-                aria-pressed={person.name === coach}
-                onClick={() => pickCoach(person.name)}
-                className={`flex min-h-20 items-center gap-4 rounded-2xl bg-white p-3 text-left ${person.name === coach ? "ring-2 ring-primary" : ""}`}
-              >
-                {person.photo ? (
-                  <img src={person.photo} alt="" className="h-16 w-16 shrink-0 rounded-full object-cover object-top" />
-                ) : (
-                  <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-muted font-display text-xl">
-                    {initials(person.name)}
-                  </span>
-                )}
-                <span className="min-w-0 flex-1">
-                  <span className="block font-display text-2xl uppercase leading-none">{person.name}</span>
-                  <span className="mt-1 block text-sm font-semibold">{person.price}</span>
-                </span>
-                {person.name === coach ? (
-                  <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-primary">Selected</span>
-                ) : null}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        {step === 3 ? (
-          <div className="mt-4">
-            <p className="mb-3 text-sm text-muted-foreground">Tap an event to book. Tap a day to list that day.</p>
-            <CalendarLegend items={legendItems(coachBlocks.filter((block) => block.dayKey.startsWith(month)))} />
-            <MonthCalendar
-              month={month}
-              minMonth={currentMonth}
-              maxMonth={maxMonth}
-              todayKey={todayKey}
-              selected={day}
-              marked={Object.keys(counts)}
-              counts={counts}
-              onlyOpen
-              events={coachBlocks}
-              onSelect={setDay}
-              onMonth={(next) => {
-                setMonth(next);
-                setDay("");
-              }}
-            />
-            {Object.keys(counts).length === 0 && coachBlocks.every((block) => !block.dayKey.startsWith(month)) ? (
-              <p className="mt-4 text-sm text-muted-foreground">No open days this month.</p>
-            ) : null}
-            {day && usesAvailability ? (
-              <>
-                {dayExtras.length > 0 ? <DayEventsPanel dayKey={day} events={dayExtras} /> : null}
-                {dayHours.length > 0 ? (
-                  <PrivateHourForm
-                    coach={coach}
-                    day={day}
-                    slots={dayHours}
-                    showDate={dayExtras.length === 0}
-                    prices={dayHours.map((slot) => {
-                      const existing = sessions.find((session) => session.id === slot.sessionId);
-                      return savedPrivatePrices[coach] ?? existing?.priceCents ?? privatePrice;
-                    })}
-                  />
-                ) : dayExtras.length === 0 ? (
-                  <p className="mt-4 text-sm text-muted-foreground">No open times this day.</p>
-                ) : null}
-              </>
-            ) : (
-              <DayEventsPanel dayKey={day} events={coachBlocks} />
-            )}
-          </div>
-        ) : null}
-        {step < 3 ? (
-          <div className="mt-6">
-            <button
-              type="button"
-              aria-expanded={showGroups}
-              onClick={() => setShowGroups((open) => !open)}
-              className="inline-flex min-h-11 items-center text-sm font-semibold text-primary"
-            >
-              {showGroups ? "Hide group schedule" : "Group schedule"}
+      {stage === "trainings" ? (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {TRAININGS.map((item) => (
+            <button key={item.key} type="button" data-training={item.label} onClick={() => pickTraining(item.key)} className={cardClass}>
+              <span className="block font-display text-3xl uppercase leading-none">{item.label}</span>
+              <span className="mt-3 block text-sm leading-snug text-muted-foreground">{item.description}</span>
+              <span className="mt-4 block text-sm font-semibold text-primary">Choose a coach</span>
             </button>
-            {showGroups ? (
-              <div className="mt-4" data-group-schedule="open">
-                <h3 className="font-display text-3xl uppercase">Group schedule</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {scopedTraining
-                    ? "Only the training you chose. Go back to see the others. Tap an event to book. Tap a day to list that day. Canceled sessions stay faded."
-                    : "Tap an event to book. Tap a day to list that day. Choose a training and this calendar keeps only that training."}
-                </p>
-                <div className="mt-3">
-                  <CalendarLegend items={legendItems(groupBlocks.filter((block) => block.dayKey.startsWith(groupMonth)))} />
-                  <MonthCalendar
-                    month={groupMonth}
-                    minMonth={currentMonth}
-                    maxMonth={maxMonth}
-                    todayKey={todayKey}
-                    selected={groupDay}
-                    marked={[]}
-                    events={groupBlocks}
-                    onSelect={setGroupDay}
-                    onMonth={(next) => {
-                      setGroupMonth(next);
-                      setGroupDay("");
-                    }}
-                  />
-                  {groupBlocks.every((block) => !block.dayKey.startsWith(groupMonth)) ? (
-                    <p className="mt-3 text-sm text-muted-foreground">No group sessions this month.</p>
-                  ) : null}
-                  <DayEventsPanel dayKey={groupDay} events={groupBlocks} />
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-      </section>
-      {step === 1 ? children : null}
-    </>
+          ))}
+        </div>
+      ) : null}
+
+      {stage === "coach" && coachCards.length === 0 ? (
+        <p className="mt-4 rounded-2xl bg-white p-5 text-sm text-muted-foreground">None are on the calendar yet.</p>
+      ) : null}
+      {stage === "coach" && coachCards.length > 0 ? (
+        <div className="mt-4 grid gap-3">
+          {coachCards.map((person) => (
+            <button
+              key={person.name}
+              type="button"
+              data-coach={person.name}
+              data-price={person.price}
+              aria-pressed={person.name === coach}
+              onClick={() => pickCoach(person.name)}
+              className={`flex min-h-20 items-center gap-4 rounded-2xl bg-white p-3 text-left ${person.name === coach ? "ring-2 ring-primary" : ""}`}
+            >
+              {person.photo ? (
+                <img src={person.photo} alt="" className="h-16 w-16 shrink-0 rounded-full object-cover object-top" />
+              ) : (
+                <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-muted font-display text-xl">
+                  {initials(person.name)}
+                </span>
+              )}
+              <span className="min-w-0 flex-1">
+                <span className="block font-display text-2xl uppercase leading-none">{person.name}</span>
+                <span className="mt-1 block text-sm font-semibold">{person.price}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {stage === "calendar" ? (
+        <div className="mt-4">
+          <p className="mb-3 text-sm text-muted-foreground">Tap an event to book. Tap a day to list that day.</p>
+          <CalendarLegend items={legendItems(coachBlocks.filter((block) => block.dayKey.startsWith(month)))} />
+          <MonthCalendar
+            month={month}
+            minMonth={currentMonth}
+            maxMonth={maxMonth}
+            todayKey={todayKey}
+            selected={day}
+            marked={Object.keys(counts)}
+            counts={counts}
+            onlyOpen
+            events={coachBlocks}
+            onSelect={setDay}
+            onMonth={(next) => {
+              setMonth(next);
+              setDay("");
+            }}
+          />
+          {Object.keys(counts).length === 0 && coachBlocks.every((block) => !block.dayKey.startsWith(month)) ? (
+            <p className="mt-4 text-sm text-muted-foreground">No open days this month.</p>
+          ) : null}
+          {day && usesAvailability ? (
+            <>
+              {dayExtras.length > 0 ? <DayEventsPanel dayKey={day} events={dayExtras} /> : null}
+              {dayHours.length > 0 ? (
+                <PrivateHourForm
+                  coach={coach}
+                  day={day}
+                  slots={dayHours}
+                  showDate={dayExtras.length === 0}
+                  prices={dayHours.map((slot) => {
+                    const existing = sessions.find((session) => session.id === slot.sessionId);
+                    return savedPrivatePrices[coach] ?? existing?.priceCents ?? privatePrice;
+                  })}
+                />
+              ) : dayExtras.length === 0 ? (
+                <p className="mt-4 text-sm text-muted-foreground">No open times this day.</p>
+              ) : null}
+            </>
+          ) : (
+            <DayEventsPanel dayKey={day} events={coachBlocks} />
+          )}
+        </div>
+      ) : null}
+    </section>
   );
 }

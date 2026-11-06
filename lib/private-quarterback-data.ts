@@ -89,6 +89,12 @@ export async function listedSessionPrice(session: {
   return session.priceCents;
 }
 
+export async function loadIntroCoachNames() {
+  const retired = await prisma.retiredCoach.findMany({ select: { coachName: true } });
+  const gone = new Set(retired.map((row) => row.coachName));
+  return privateQuarterbackCoachNames([]).filter((name) => !gone.has(name) && !isPlaceholderCoach(name));
+}
+
 export function privateQuarterbackCoachNames(extraCoaches: string[]) {
   const names = [...QUARTERBACK_COACHES] as string[];
   for (const coach of extraCoaches) {

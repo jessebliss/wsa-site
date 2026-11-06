@@ -85,7 +85,7 @@ export default async function SubscriptionsPage({
             <option value="" disabled>Choose</option>
             {plans.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.name} · {formatMoney(item.priceCents)} {item.billingInterval === "YEAR" ? "per year" : "per month"} · {item.sessionsPerMonth} times
+                {item.name} · {formatMoney(item.priceCents)} {item.billingInterval === "YEAR" ? "per year" : "per month"} · {item.sessionsPerMonth <= 0 ? "Unlimited" : `${item.sessionsPerMonth} times`}
               </option>
             ))}
           </select>
@@ -155,7 +155,7 @@ export default async function SubscriptionsPage({
                 <div className="text-right text-sm">
                   <p className="font-semibold">{STATUS_LABEL[sub.status]}</p>
                   <p>{formatMoney(sub.priceCents)}</p>
-                  <p>{sub.sessionsUsed}/{sub.sessionsIncluded} used</p>
+                  <p>{sub.sessionsIncluded <= 0 ? "Unlimited" : `${sub.sessionsUsed}/${sub.sessionsIncluded} used`}</p>
                 </div>
               </div>
             </Link>
