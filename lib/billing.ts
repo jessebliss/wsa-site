@@ -291,7 +291,7 @@ async function sendSubscriptionReceipt(subscriptionId: string) {
       "",
       `Player: ${sub.playerName}`,
       `Parent: ${sub.parentName}`,
-      `Session: ${sub.plan?.name || sub.planName || "Membership"}`,
+      `Plan: ${sub.plan?.name || sub.planName || "Membership"}`,
       `Amount: ${formatMoney(sub.priceCents)} ${sub.plan?.billingInterval === "YEAR" ? "per year" : "per month"}`,
       sub.sessionsIncluded <= 0
         ? "Group times on this membership do not run out."

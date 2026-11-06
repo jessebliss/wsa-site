@@ -8,41 +8,34 @@ import {
 import { prisma } from "@/lib/prisma";
 import { offeringKey, offeringLabel, offeringRank } from "@/lib/schedule-filter";
 
-const NEXT = "Choose a coach";
-
-const KNOWN: Record<string, { name: string; description: string; nextStep: string; sortOrder: number; colorProgram: string }> = {
+const KNOWN: Record<string, { name: string; description: string; sortOrder: number; colorProgram: string }> = {
   [PRIVATE_QUARTERBACK_KEY]: {
     name: "Quarterback Training",
     description: "One-on-one quarterback training. You choose the coach and the time.",
-    nextStep: NEXT,
     sortOrder: 0,
     colorProgram: QUARTERBACK_PROGRAM,
   },
   [`program:${QUARTERBACK_PROGRAM}`]: {
     name: GROUP_QUARTERBACK_LABEL,
     description: "Group quarterback on the monthly schedule.",
-    nextStep: NEXT,
     sortOrder: 1,
     colorProgram: QUARTERBACK_PROGRAM,
   },
   [INTRO_KEY]: {
     name: INTRO_LABEL,
     description: INTRO_NOTE,
-    nextStep: "Continue to checkout",
     sortOrder: 2,
     colorProgram: INTRO_PROGRAM,
   },
   [`program:${SPEED_PROGRAM}`]: {
     name: SPEED_PROGRAM,
     description: "Speed and agility with the academy coaches.",
-    nextStep: NEXT,
     sortOrder: 10,
     colorProgram: SPEED_PROGRAM,
   },
   "program:Girls Flag": {
     name: "Girls Flag",
     description: "Girls flag with the academy coaches.",
-    nextStep: NEXT,
     sortOrder: 20,
     colorProgram: "Girls Flag",
   },
@@ -53,7 +46,6 @@ async function findOrCreateType(key: string, session: { program: string; title: 
   const draft = known ?? {
     name: offeringLabel(session),
     description: session.kind === "CAMP" ? "A camp on the academy calendar." : "Training on the academy calendar.",
-    nextStep: NEXT,
     sortOrder: offeringRank(session),
     colorProgram: session.program,
   };
@@ -66,7 +58,6 @@ async function findOrCreateType(key: string, session: { program: string; title: 
       data: {
         name: draft.name,
         description: draft.description,
-        nextStep: draft.nextStep,
         offeringKey: key,
         colorProgram: draft.colorProgram,
         sortOrder: draft.sortOrder,

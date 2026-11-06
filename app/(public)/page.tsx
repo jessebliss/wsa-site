@@ -139,7 +139,6 @@ export default async function SchedulePage({
           id: type.id,
           name: type.name,
           description: type.description,
-          nextStep: type.nextStep,
           offeringKey: type.offeringKey,
           sortOrder: type.sortOrder,
         }))}

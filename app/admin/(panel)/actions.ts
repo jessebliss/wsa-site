@@ -323,14 +323,14 @@ export async function deletePlan(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   try {
     const plan = await prisma.plan.findUnique({ where: { id } });
-    if (!plan) throw new Error("That session is already gone.");
+    if (!plan) throw new Error("That plan is already gone.");
     const live = await prisma.subscription.count({
       where: { planId: id, status: { not: "CANCELED" } },
     });
     if (live > 0) {
       const noun = live === 1 ? "membership that is not canceled" : "memberships that are not canceled";
       throw new Error(
-        `This session still has ${live} ${noun}. Delete was refused. Those people were not canceled automatically.`,
+        `This plan still has ${live} ${noun}. Delete was refused. Those people were not canceled automatically.`,
       );
     }
     await prisma.$transaction([
@@ -370,7 +370,6 @@ export async function createTrainingType(formData: FormData) {
   try {
     const name = String(formData.get("name") ?? "").trim();
     const description = String(formData.get("description") ?? "").trim();
-    const nextStep = String(formData.get("nextStep") ?? "").trim() || "Choose a coach";
     if (!name) throw new Error("Name the type.");
     const taken = await prisma.trainingType.findUnique({ where: { name } });
     if (taken) throw new Error("That type already exists.");
@@ -379,7 +378,6 @@ export async function createTrainingType(formData: FormData) {
       data: {
         name,
         description,
-        nextStep,
         colorProgram: name,
         sortOrder: (latest?.sortOrder ?? 0) + 1,
       },
@@ -398,11 +396,10 @@ export async function updateTrainingType(formData: FormData) {
   try {
     const name = String(formData.get("name") ?? "").trim();
     const description = String(formData.get("description") ?? "").trim();
-    const nextStep = String(formData.get("nextStep") ?? "").trim() || "Choose a coach";
     if (!name) throw new Error("Name the type.");
     const taken = await prisma.trainingType.findFirst({ where: { name, NOT: { id } } });
     if (taken) throw new Error("That type already exists.");
-    await prisma.trainingType.update({ where: { id }, data: { name, description, nextStep } });
+    await prisma.trainingType.update({ where: { id }, data: { name, description } });
   } catch (error) {
     fail("/admin/types", error);
   }

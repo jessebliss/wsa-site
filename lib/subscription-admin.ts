@@ -5,7 +5,7 @@ import { etToUtc } from "@/lib/time";
 import { normalizeEmail } from "@/lib/utils";
 
 export function subscriptionPlanName(sub: { plan: { name: string } | null; planName: string }) {
-  return sub.plan?.name || sub.planName || "Deleted session";
+  return sub.plan?.name || sub.planName || "Deleted plan";
 }
 
 async function load(id: string) {
@@ -23,7 +23,7 @@ async function load(id: string) {
 export async function changeSubscriptionPlan(id: string, planId: string) {
   const local = await load(id);
   const plan = await prisma.plan.findUnique({ where: { id: planId } });
-  if (!plan || !plan.active) throw new Error("That session is not available.");
+  if (!plan || !plan.active) throw new Error("That plan is not available.");
   const priced = await ensurePlanStripePrice(plan);
   const stripe = getStripe();
   const remote = await stripe.subscriptions.retrieve(local.stripeSubscriptionId!);

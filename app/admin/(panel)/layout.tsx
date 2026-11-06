@@ -6,7 +6,7 @@ const adminLinks: [string, string][] = [
   ["Overview", "/admin"],
   ["Schedule", "/admin/schedule"],
   ["Types", "/admin/types"],
-  ["Sessions", "/admin/sessions"],
+  ["Plans", "/admin/sessions"],
   ["Fees", "/admin/fees"],
   ["Subscriptions", "/admin/subscriptions"],
   ["Participants", "/admin/participants"],

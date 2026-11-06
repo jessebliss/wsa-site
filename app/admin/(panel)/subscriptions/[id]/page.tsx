@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { centsToDollarInput, formatMoney } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { subscriptionPlanName } from "@/lib/subscription-admin";
-import { planCadence } from "@/lib/plan-options";
+import { planCadence, planIsUnlimited } from "@/lib/plan-options";
 import { formatEt, formatEtDate } from "@/lib/time";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -56,7 +56,7 @@ export default async function SubscriptionDetail({
       {sub.paymentMethod === "VENMO" ? (
         <p className="mt-3 text-sm">This membership was paid by Venmo. Canceling it here does not refund a card.</p>
       ) : !sub.stripeSubscriptionId ? (
-        <p className="mt-3 text-sm">This membership has no card on file, so the price and session cannot be changed here.</p>
+        <p className="mt-3 text-sm">This membership has no card on file, so the price and plan cannot be changed here.</p>
       ) : null}
       <AdminError message={query.error} />
       {sub.paymentMethod === "VENMO" ? (
@@ -77,20 +77,20 @@ export default async function SubscriptionDetail({
         <form action={subscriptionAction} className="rounded-2xl bg-white p-4">
           <input type="hidden" name="id" value={sub.id} />
           <input type="hidden" name="action" value="plan" />
-          <Label htmlFor="planId">Change session</Label>
-          <p className="text-xs text-muted-foreground">The difference is billed now. This person moves to the new session&apos;s price and included times.</p>
+          <Label htmlFor="planId">Change plan</Label>
+          <p className="text-xs text-muted-foreground">The difference is billed now. This person moves to the new plan&apos;s price and included times.</p>
           <select id="planId" name="planId" className="mt-2 h-11 w-full rounded-md border border-border px-3" defaultValue={sub.planId ?? ""}>
             {plans.map((plan) => (
-              <option key={plan.id} value={plan.id}>{plan.name} · {formatMoney(plan.priceCents)} {planCadence(plan.billingInterval)} · {plan.sessionsPerMonth} times</option>
+              <option key={plan.id} value={plan.id}>{plan.name} · {formatMoney(plan.priceCents)} {planCadence(plan.billingInterval)} · {planIsUnlimited(plan.sessionsPerMonth) ? "Unlimited" : `${plan.sessionsPerMonth} times`}</option>
             ))}
           </select>
-          <Button className="mt-3 w-full" type="submit">Update session</Button>
+          <Button className="mt-3 w-full" type="submit">Update plan</Button>
         </form>
         <form action={subscriptionAction} className="rounded-2xl bg-white p-4">
           <input type="hidden" name="id" value={sub.id} />
           <input type="hidden" name="action" value="price" />
           <Label htmlFor="price">Custom price</Label>
-          <p className="text-xs text-muted-foreground">Only this person. The session price for everyone else stays the same, and the difference is billed now.</p>
+          <p className="text-xs text-muted-foreground">Only this person. The plan price for everyone else stays the same, and the difference is billed now.</p>
           <Input className="mt-2" id="price" name="price" defaultValue={centsToDollarInput(sub.priceCents)} />
           <Button className="mt-3 w-full" type="submit" variant="outline">Set custom price</Button>
         </form>

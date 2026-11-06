@@ -79,7 +79,7 @@ export async function GET(request: Request) {
     ),
     ...subscriptions.map((row) =>
       [
-        "Monthly session",
+        "Plan",
         row.createdAt.toISOString(),
         row.parentName,
         row.email,
@@ -89,7 +89,7 @@ export async function GET(request: Request) {
         "",
         "",
         "",
-        row.plan?.name || row.planName || "Deleted session",
+        row.plan?.name || row.planName || "Deleted plan",
         row.currentPeriodEnd ? formatEtLong(row.currentPeriodEnd) : "",
         formatMoney(row.priceCents),
         row.status,

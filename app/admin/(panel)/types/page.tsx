@@ -29,7 +29,7 @@ export default async function TypesPage({
     <div>
       <h1 className="font-display text-4xl uppercase">Types</h1>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-        A type is one choice on the public schedule, such as Quarterback Training. Each session belongs to one type. Removing a type that still has sessions is refused.
+        A type groups events on the calendar. Each event belongs to one type. Girls Quarterback Training and Elite Quarterback Camp stay off the parent list. Removing a type that still has events is refused.
       </p>
       <AdminError message={params.error} />
       <DisclosurePanel label="New type" hideLabel="Hide form" className="mt-4">
@@ -41,10 +41,6 @@ export default async function TypesPage({
           <div>
             <Label htmlFor="description">Description</Label>
             <Input className="mt-1" id="description" name="description" placeholder="One-on-one quarterback training." />
-          </div>
-          <div>
-            <Label htmlFor="nextStep">Next step</Label>
-            <Input className="mt-1" id="nextStep" name="nextStep" defaultValue="Choose a coach" />
           </div>
           <Button type="submit">Add type</Button>
         </form>
@@ -62,7 +58,6 @@ export default async function TypesPage({
                 <input type="hidden" name="id" value={type.id} />
                 <Input name="name" defaultValue={type.name} required aria-label="Name" />
                 <Input name="description" defaultValue={type.description} aria-label="Description" />
-                <Input name="nextStep" defaultValue={type.nextStep} aria-label="Next step" />
                 <Button type="submit" variant="outline">Save type</Button>
               </form>
               <ConfirmForm

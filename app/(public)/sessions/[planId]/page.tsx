@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PlanForm } from "@/components/plan-form";
 import { formatMoney } from "@/lib/money";
-import { planCadence, planIsUnlimited } from "@/lib/plan-options";
+import { planCadence, planIsUnlimited, planOpenForSignup } from "@/lib/plan-options";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +18,7 @@ export default async function SessionOfferPage({
   const query = await searchParams;
   const plan = await prisma.plan.findUnique({ where: { id: planId } });
   if (!plan || !plan.active) notFound();
+  const open = planOpenForSignup(plan);
   const waiver = await prisma.waiver.findFirst({
     where: { isCurrent: true },
     orderBy: { createdAt: "desc" },
@@ -37,8 +38,10 @@ export default async function SessionOfferPage({
           : `${plan.sessionsPerMonth} group ${plan.program} times each billing period. Unused times do not roll over.`}
         {plan.billingInterval === "YEAR" ? " Yearly is one charge per year." : ""}
       </p>
-      {query.canceled ? <p className="mt-3 text-sm font-semibold">Checkout was canceled. You can try again.</p> : null}
-      {waiver ? (
+      {open && query.canceled ? <p className="mt-3 text-sm font-semibold">Checkout was canceled. You can try again.</p> : null}
+      {!open ? (
+        <p className="mt-6 rounded-xl bg-white p-4 text-sm">This plan is not open for new signups. People already on it keep it.</p>
+      ) : waiver ? (
         <div className="mt-6">
           <PlanForm
             planId={plan.id}

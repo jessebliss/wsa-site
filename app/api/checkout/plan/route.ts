@@ -5,6 +5,7 @@ import { ensurePlanStripePrice } from "@/lib/billing";
 import { prisma } from "@/lib/prisma";
 import { getStripe, stripeConfigured } from "@/lib/stripe";
 import { appUrl, normalizeEmail } from "@/lib/utils";
+import { planOpenForSignup } from "@/lib/plan-options";
 import { personSchema, zodMessage } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
@@ -24,17 +25,20 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: zodMessage(parsed.error) }, { status: 400 });
   }
-  if (!stripeConfigured()) {
-    return NextResponse.json(
-      { error: "Monthly sessions bill through Stripe. Add a test secret key to start a subscription." },
-      { status: 503 },
-    );
-  }
 
   try {
     const plan = await prisma.plan.findUnique({ where: { id: parsed.data.planId } });
     if (!plan || !plan.active) {
-      return NextResponse.json({ error: "That session is not available." }, { status: 404 });
+      return NextResponse.json({ error: "That plan is not available." }, { status: 404 });
+    }
+    if (!planOpenForSignup(plan)) {
+      return NextResponse.json({ error: "That plan is not open for new signups." }, { status: 404 });
+    }
+    if (!stripeConfigured()) {
+      return NextResponse.json(
+        { error: "Monthly sessions bill through Stripe. Add a test secret key to start a subscription." },
+        { status: 503 },
+      );
     }
     const priced = await ensurePlanStripePrice(plan);
     const waiver = await prisma.waiver.findFirst({
@@ -73,7 +77,7 @@ export async function POST(request: Request) {
     if (!checkout.url) throw new Error("Stripe did not return a checkout link.");
     return NextResponse.json({ redirect: checkout.url });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not start the session.";
+    const message = error instanceof Error ? error.message : "Could not start the plan.";
     const status = error instanceof BookingError ? 400 : 502;
     return NextResponse.json({ error: message }, { status });
   }

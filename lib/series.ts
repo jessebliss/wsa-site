@@ -141,7 +141,7 @@ function checkInput(input: EventInput) {
   if (!input.typeId) throw new Error("Choose a type.");
   if (!input.program || !input.title || !input.location) throw new Error("Type, title, and location are required.");
   if (input.program === "QB Introduction Session") {
-    throw new Error("QB Introduction Session is not scheduled. Parents book it from Choose your training.");
+    throw new Error("QB Introduction Session is not scheduled. Parents book it from New quarterback, then choose a coach.");
   }
   if (!Number.isInteger(input.capacity) || input.capacity < 1) throw new Error("Capacity has to be at least 1.");
   if (!["GROUP", "CAMP", "PRIVATE"].includes(input.kind)) throw new Error("Choose group, camp, or private.");

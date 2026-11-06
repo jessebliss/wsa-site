@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { CheckoutForm } from "@/components/checkout-form";
 import { chargeLines, checkoutLineItems } from "@/lib/fees";
 import { loadCheckoutFees } from "@/lib/fees-data";
@@ -21,6 +22,7 @@ export default async function IntroCheckoutPage({
   const coaches = await loadIntroCoachNames();
   const requested = matchCoachName(query.coach ?? "", coaches);
   const coach = !requested || isPlaceholderCoach(requested) || !coaches.includes(requested) ? "" : requested;
+  if (!coach) redirect("/?start=new");
   const waiver = await prisma.waiver.findFirst({
     where: { isCurrent: true },
     orderBy: { createdAt: "desc" },
@@ -32,21 +34,16 @@ export default async function IntroCheckoutPage({
 
   return (
     <div className="mx-auto max-w-lg px-4 py-8">
-      <Link href={coach ? "/?start=new-coach" : "/?start=new"} className="text-sm font-semibold text-primary">
-        {coach ? "Choose a coach" : "Back"}
+      <Link href="/?start=new-coach" className="text-sm font-semibold text-primary">
+        Choose a coach
       </Link>
       <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-primary">{INTRO_LABEL}</p>
       <h1 className="font-display text-4xl uppercase">{INTRO_LABEL}</h1>
       <p className="mt-2 text-sm">{INTRO_NOTE}</p>
       <p className="mt-3 text-sm font-semibold">{formatMoney(INTRO_PRICE_CENTS)}</p>
-      {coach ? <p className="mt-2 text-sm" data-intro-coach={coach}>With {coach}</p> : null}
+      <p className="mt-2 text-sm" data-intro-coach={coach}>With {coach}</p>
       <p className="mt-2 text-sm text-muted-foreground">This is a one-time payment. It is not on the calendar. Monthly sessions do not cover it.</p>
-      {!coach ? (
-        <p className="mt-6 rounded-xl bg-white p-4 text-sm">
-          Choose a coach for the introduction session before payment.{" "}
-          <Link href="/?start=new-coach" className="font-semibold text-primary">Choose a coach</Link>
-        </p>
-      ) : !waiver ? (
+      {!waiver ? (
         <p className="mt-6 rounded-xl bg-white p-4 text-sm">The waiver is not published yet.</p>
       ) : (
         <div className="mt-6">

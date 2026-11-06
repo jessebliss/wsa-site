@@ -34,6 +34,12 @@ export function offeringLabel(session: OfferingSession) {
   return session.program;
 }
 
+/** Kept on the calendar and in admin. Not a choice on the parent training list. */
+export function hiddenFromParentList(label: string) {
+  const name = label.trim().toLowerCase();
+  return name.includes("girls quarterback") || name.includes("elite quarterback camp");
+}
+
 export function offeringRank(session: OfferingSession) {
   if (isPrivateQuarterback(session)) return 0;
   if (isIntro(session)) return 2;

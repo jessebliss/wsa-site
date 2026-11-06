@@ -21,7 +21,7 @@ import {
   type PrivateHourSession,
 } from "@/lib/private-quarterback";
 import { colorForProgram, type PlanColorSource } from "@/lib/plan-options";
-import { isPlaceholderCoach, openSessions, parentCoachNames } from "@/lib/schedule-filter";
+import { hiddenFromParentList, isPlaceholderCoach, openSessions, parentCoachNames } from "@/lib/schedule-filter";
 import { dayKeysForMonth, etDayKey, etToUtc, formatEt, formatEtTime } from "@/lib/time";
 
 export type ScheduleSession = {
@@ -163,10 +163,11 @@ export type LandingPlanCard = {
   yearly: boolean;
 };
 
-type ScheduleType = { id: string; name: string; description: string; nextStep: string; offeringKey: string | null; sortOrder: number };
+type ScheduleType = { id: string; name: string; description: string; offeringKey: string | null; sortOrder: number };
 type PathKey = "intro" | "private" | "group" | "flag" | "film" | "speed";
 type Stage = "home" | "intro" | "trainings" | "coach" | "calendar";
 
+/** Parent list. Girls Quarterback Training and Elite Quarterback Camp stay off it. */
 const TRAININGS: { key: Exclude<PathKey, "intro">; label: string; description: string }[] = [
   { key: "private", label: "Private quarterback", description: "One-on-one quarterback training. You choose the coach and the time." },
   { key: "group", label: "Group quarterback", description: "Group quarterback on the schedule." },
@@ -178,6 +179,7 @@ const TRAININGS: { key: Exclude<PathKey, "intro">; label: string; description: s
 function pathMatchesType(type: ScheduleType, key: Exclude<PathKey, "intro">) {
   const name = type.name;
   const offering = type.offeringKey ?? "";
+  if (hiddenFromParentList(name) || hiddenFromParentList(offering)) return false;
   if (key === "private") return offering === PRIVATE_QUARTERBACK_KEY;
   if (key === "group") return offering === `program:${QUARTERBACK_PROGRAM}`;
   if (key === "speed") return offering === `program:${SPEED_PROGRAM}` || /speed/i.test(name);
@@ -186,6 +188,7 @@ function pathMatchesType(type: ScheduleType, key: Exclude<PathKey, "intro">) {
 }
 
 function sessionOnPath(session: ScheduleSession, key: Exclude<PathKey, "intro">, typeId: string) {
+  if (hiddenFromParentList(session.title) || hiddenFromParentList(session.program)) return false;
   if (typeId) return session.typeId === typeId;
   if (key === "private") return isPrivateQuarterback(session);
   if (key === "group") return session.kind === "GROUP" && session.program === QUARTERBACK_PROGRAM && !isIntro(session);
@@ -465,8 +468,7 @@ export function PublicSchedule({
               <span className="mt-4 block text-sm font-semibold text-primary">Choose a training</span>
             </button>
           </div>
-          <div id="plans" className="mt-8 scroll-mt-24">
-            <div id="sessions" />
+            <div id="plans" className="mt-8 scroll-mt-24">
             <h2 className="font-display text-4xl uppercase leading-none">Plans</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {landingPlans.map((plan) => (
@@ -507,7 +509,7 @@ export function PublicSchedule({
 
       {stage === "trainings" ? (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {TRAININGS.map((item) => (
+          {TRAININGS.filter((item) => !hiddenFromParentList(item.label)).map((item) => (
             <button key={item.key} type="button" data-training={item.label} onClick={() => pickTraining(item.key)} className={cardClass}>
               <span className="block font-display text-3xl uppercase leading-none">{item.label}</span>
               <span className="mt-3 block text-sm leading-snug text-muted-foreground">{item.description}</span>
