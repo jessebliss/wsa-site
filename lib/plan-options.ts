@@ -70,10 +70,3 @@ export function planCadence(interval: string | null | undefined) {
 export function planIsUnlimited(sessions: number | null | undefined) {
   return (sessions ?? 0) <= 0;
 }
-
-/** Older memberships stay on file. These seed keys are not offered to new parents. */
-const CLOSED_TO_NEW_SIGNUPS = new Set(["qb-monthly"]);
-
-export function planOpenForSignup(plan: { active: boolean; seedKey?: string | null }) {
-  return plan.active && !CLOSED_TO_NEW_SIGNUPS.has(plan.seedKey ?? "");
-}

@@ -117,9 +117,6 @@ export default async function SessionsAdmin({
               <i className="h-3 w-3 rounded-sm" style={{ backgroundColor: eventColor(plan.color).hex }} aria-hidden="true" />
               {plan.active ? "Active" : "Hidden"} · {formatMoney(plan.priceCents)} {planCadence(plan.billingInterval)} · {planIsUnlimited(plan.sessionsPerMonth) ? "Unlimited" : `${plan.sessionsPerMonth} times`}
             </p>
-            {plan.seedKey === "qb-monthly" ? (
-              <p className="mt-1 text-sm text-muted-foreground">Closed to new signups. People already on it keep it.</p>
-            ) : null}
             <form action={savePlan} className="mt-3 grid gap-3 sm:grid-cols-2">
               <input type="hidden" name="id" value={plan.id} />
               <input type="hidden" name="sortOrder" value={plan.sortOrder} />

@@ -5,7 +5,6 @@ import { ensurePlanStripePrice } from "@/lib/billing";
 import { prisma } from "@/lib/prisma";
 import { getStripe, stripeConfigured } from "@/lib/stripe";
 import { appUrl, normalizeEmail } from "@/lib/utils";
-import { planOpenForSignup } from "@/lib/plan-options";
 import { personSchema, zodMessage } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
@@ -30,9 +29,6 @@ export async function POST(request: Request) {
     const plan = await prisma.plan.findUnique({ where: { id: parsed.data.planId } });
     if (!plan || !plan.active) {
       return NextResponse.json({ error: "That plan is not available." }, { status: 404 });
-    }
-    if (!planOpenForSignup(plan)) {
-      return NextResponse.json({ error: "That plan is not open for new signups." }, { status: 404 });
     }
     if (!stripeConfigured()) {
       return NextResponse.json(

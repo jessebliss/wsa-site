@@ -107,21 +107,12 @@ async function main() {
 
   await ensurePlan({
     seedKey: "speed-monthly",
-    name: "Speed & Agility Monthly",
+    name: "Monthly Speed & Agility",
     program: "Speed & Agility",
     color: "teal",
     sessionsPerMonth: 8,
     priceCents: 27500,
     sortOrder: 1,
-  });
-  await ensurePlan({
-    seedKey: "qb-monthly",
-    name: "Quarterback Training Monthly",
-    program: "Quarterback Training",
-    color: "blue",
-    sessionsPerMonth: 4,
-    priceCents: 42500,
-    sortOrder: 2,
   });
 
   const speed = {

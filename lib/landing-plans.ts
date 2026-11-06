@@ -100,9 +100,48 @@ export async function ensureLandingPlans() {
     }
   }
 
+  await retireReplacedPlans();
+
   const rows = await prisma.plan.findMany({
     where: { seedKey: { in: specs.map((spec) => spec.seedKey) }, active: true },
   });
   const order = new Map(specs.map((spec, index) => [spec.seedKey, index]));
   return rows.sort((a, b) => (order.get(a.seedKey ?? "") ?? 99) - (order.get(b.seedKey ?? "") ?? 99));
+}
+
+/** Drop a plan only when the new-format plan is already stored. Sessions stay. */
+async function retireReplacedPlans() {
+  const replacement = await prisma.plan.findUnique({ where: { seedKey: "group-unlimited-month" } });
+  if (replacement) {
+    const oldMonthly = await prisma.plan.findMany({
+      where: {
+        NOT: { id: replacement.id },
+        OR: [
+          { seedKey: "qb-monthly" },
+          {
+            name: "Quarterback Training Monthly",
+            program: QUARTERBACK_PROGRAM,
+            sessionsPerMonth: 4,
+            billingInterval: "MONTH",
+          },
+        ],
+      },
+    });
+    for (const plan of oldMonthly) await deletePlanCopy(plan.id, plan.name);
+  }
+
+  const speed = await prisma.plan.findUnique({ where: { seedKey: "speed-monthly" } });
+  if (!speed || speed.name !== "Monthly Speed & Agility") return;
+  const oldSpeed = await prisma.plan.findMany({
+    where: { name: "Speed & Agility Monthly", NOT: { id: speed.id } },
+  });
+  for (const plan of oldSpeed) await deletePlanCopy(plan.id, plan.name);
+}
+
+async function deletePlanCopy(id: string, name: string) {
+  await prisma.subscription.updateMany({
+    where: { planId: id, planName: "" },
+    data: { planName: name },
+  });
+  await prisma.plan.delete({ where: { id } });
 }
