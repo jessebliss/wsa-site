@@ -45,16 +45,16 @@ export function DayEventsPanel({ dayKey, events }: { dayKey: string; events: Cal
                 key={event.id}
                 data-day-event={event.id}
                 data-canceled={event.canceled ? "yes" : "no"}
-                className="overflow-hidden rounded-xl border border-border border-l-4"
-                style={{ borderLeftColor: event.color, opacity: event.canceled ? 0.55 : 1 }}
+                className="overflow-hidden rounded-2xl border-2 border-ink bg-background"
+                style={{ borderLeftColor: event.color, borderLeftWidth: 4, opacity: event.canceled ? 0.55 : 1 }}
               >
                 {event.href ? (
-                  <Link href={event.href} className="block min-h-11 p-3" data-book={book ? "yes" : undefined}>
+                  <Link href={event.href} className="group block min-h-11 px-5 py-5 hover:bg-muted" data-book={book ? "yes" : undefined}>
                     {body}
-                    <p className="mt-3 text-sm font-semibold text-primary">{book ? "Book" : "Open"}</p>
+                    <p className="mt-4 border-t-2 border-primary pt-3 text-base font-semibold text-ink">{book ? "Book this time" : "Open"}</p>
                   </Link>
                 ) : (
-                  <div className="p-3">{body}</div>
+                  <div className="px-5 py-5">{body}</div>
                 )}
               </li>
             );

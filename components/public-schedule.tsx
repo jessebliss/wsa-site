@@ -132,7 +132,7 @@ function PrivateHourForm({
           return (
             <label
               key={slot.hour}
-              className={`flex min-h-11 cursor-pointer flex-col items-center justify-center rounded-xl px-2 text-center text-sm font-semibold ${on ? "bg-primary text-white" : "bg-muted"}`}
+              className={`flex min-h-12 cursor-pointer flex-col items-center justify-center rounded-xl border-2 px-2 text-center text-sm font-semibold ${on ? "border-primary bg-background text-ink" : "border-ink bg-muted text-ink"}`}
             >
               <input
                 type="radio"
@@ -415,9 +415,10 @@ export function PublicSchedule({
   }, [sessions, coach, path, plans, speedPrices, savedPrivatePrices, onThisCoach]);
   const openHourIds = new Set(dayHours.flatMap((slot) => (slot.sessionId ? [slot.sessionId] : [])));
   const dayExtras = coachBlocks.filter((event) => event.dayKey === day && !openHourIds.has(event.id));
-  const cardClass = "flex min-h-44 flex-col rounded-2xl bg-white px-5 py-5 text-left";
   const choiceClass =
-    "flex min-h-48 w-full cursor-pointer flex-col overflow-hidden rounded-2xl border-2 border-ink bg-background text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:bg-muted";
+    "group flex min-h-44 w-full cursor-pointer flex-col rounded-2xl border-2 border-ink bg-background px-5 py-5 text-left hover:border-primary hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:border-primary active:bg-muted";
+  const choiceAction =
+    "mt-auto border-t-2 border-primary pt-4 text-base font-semibold text-ink";
 
   return (
     <section id="schedule" className="mt-6 scroll-mt-24" data-step={stage}>
@@ -436,7 +437,7 @@ export function PublicSchedule({
         </button>
       ) : null}
       {stage === "calendar" && coach ? (
-        <div data-selected-coach={coach} className="mt-4 flex items-center gap-4 rounded-2xl border-2 border-primary bg-white p-4">
+        <div data-selected-coach={coach} className="mt-4 flex items-center gap-4 rounded-2xl border-2 border-ink bg-background p-4">
           {coachPhoto ? (
             <img src={coachPhoto} alt="" className="h-16 w-16 shrink-0 rounded-full object-cover object-top" />
           ) : (
@@ -456,26 +457,18 @@ export function PublicSchedule({
         <>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <button type="button" data-choice="new" onClick={() => { setPath("intro"); setStage("intro"); }} className={choiceClass}>
-              <span className="flex flex-1 flex-col px-5 py-5">
-                <span className="block font-display text-3xl uppercase leading-none">New quarterback</span>
-                <span className="mt-3 block text-sm leading-snug text-muted-foreground">
-                  Start with the introduction session. {formatMoney(INTRO_PRICE_CENTS)}.
-                </span>
+              <span className="block font-display text-3xl uppercase leading-none">New quarterback</span>
+              <span className="mt-3 block text-sm leading-snug text-muted-foreground">
+                Start with the introduction session. {formatMoney(INTRO_PRICE_CENTS)}.
               </span>
-              <span className="flex min-h-12 items-center justify-center bg-primary px-5 text-center text-base font-semibold text-white">
-                Introduction session
-              </span>
+              <span className={choiceAction}>Introduction session</span>
             </button>
             <button type="button" data-choice="existing" onClick={() => setStage("trainings")} className={choiceClass}>
-              <span className="flex flex-1 flex-col px-5 py-5">
-                <span className="block font-display text-3xl uppercase leading-none">Existing client</span>
-                <span className="mt-3 block text-sm leading-snug text-muted-foreground">
-                  Pick the training you already do, then a coach and a time.
-                </span>
+              <span className="block font-display text-3xl uppercase leading-none">Existing client</span>
+              <span className="mt-3 block text-sm leading-snug text-muted-foreground">
+                Pick the training you already do, then a coach and a time.
               </span>
-              <span className="flex min-h-12 items-center justify-center bg-primary px-5 text-center text-base font-semibold text-white">
-                Choose a training
-              </span>
+              <span className={choiceAction}>Choose a training</span>
             </button>
           </div>
           <div id="plans" className="mt-8 scroll-mt-24">
@@ -489,16 +482,12 @@ export function PublicSchedule({
                   data-yearly={plan.yearly ? "yes" : undefined}
                   className={choiceClass}
                 >
-                  <span className="flex flex-1 flex-col px-5 py-5">
-                    <span className="block font-display text-3xl uppercase leading-none">{plan.name}</span>
-                    <span className="mt-3 block font-display text-4xl leading-none">
-                      {plan.priceLabel}<span className="text-base"> {plan.cadence}</span>
-                    </span>
-                    <span className="mt-3 block text-sm leading-snug text-muted-foreground">{plan.detail}</span>
+                  <span className="block font-display text-3xl uppercase leading-none">{plan.name}</span>
+                  <span className="mt-3 block font-display text-4xl leading-none">
+                    {plan.priceLabel}<span className="text-base"> {plan.cadence}</span>
                   </span>
-                  <span className="flex min-h-12 items-center justify-center bg-primary px-5 text-center text-base font-semibold text-white">
-                    Continue to checkout
-                  </span>
+                  <span className="mt-3 block text-sm leading-snug text-muted-foreground">{plan.detail}</span>
+                  <span className={choiceAction}>Continue to checkout</span>
                 </Link>
               ))}
             </div>
@@ -507,27 +496,26 @@ export function PublicSchedule({
       ) : null}
 
       {stage === "intro" ? (
-        <div className="mt-4 rounded-2xl bg-white p-5" data-intro="yes">
-          <p className="font-display text-3xl uppercase leading-none">Introduction session</p>
-          <p className="mt-3 text-sm leading-snug text-muted-foreground">{INTRO_NOTE}</p>
-          <p className="mt-3 text-sm font-semibold">{formatMoney(INTRO_PRICE_CENTS)}</p>
-          <button
-            type="button"
-            className="mt-4 text-sm font-semibold text-primary"
-            onClick={() => { setPath("intro"); setStage("coach"); }}
-          >
-            Choose a coach
-          </button>
-        </div>
+        <button
+          type="button"
+          data-intro="yes"
+          className={`${choiceClass} mt-4 max-w-xl`}
+          onClick={() => { setPath("intro"); setStage("coach"); }}
+        >
+          <span className="block font-display text-3xl uppercase leading-none">Introduction session</span>
+          <span className="mt-3 block text-sm leading-snug text-muted-foreground">{INTRO_NOTE}</span>
+          <span className="mt-3 block text-sm font-semibold">{formatMoney(INTRO_PRICE_CENTS)}</span>
+          <span className={choiceAction}>Choose a coach</span>
+        </button>
       ) : null}
 
       {stage === "trainings" ? (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {TRAININGS.filter((item) => !hiddenFromParentList(item.label)).map((item) => (
-            <button key={item.key} type="button" data-training={item.label} onClick={() => pickTraining(item.key)} className={cardClass}>
+            <button key={item.key} type="button" data-training={item.label} onClick={() => pickTraining(item.key)} className={choiceClass}>
               <span className="block font-display text-3xl uppercase leading-none">{item.label}</span>
               <span className="mt-3 block text-sm leading-snug text-muted-foreground">{item.description}</span>
-              <span className="mt-4 block text-sm font-semibold text-primary">Choose a coach</span>
+              <span className={choiceAction}>Choose a coach</span>
             </button>
           ))}
         </div>
@@ -546,19 +534,22 @@ export function PublicSchedule({
               data-price={person.price}
               aria-pressed={person.name === coach}
               onClick={() => pickCoach(person.name)}
-              className={`flex min-h-20 items-center gap-4 rounded-2xl bg-white p-3 text-left ${person.name === coach ? "ring-2 ring-primary" : ""}`}
+              className={choiceClass}
             >
-              {person.photo ? (
-                <img src={person.photo} alt="" className="h-16 w-16 shrink-0 rounded-full object-cover object-top" />
-              ) : (
-                <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-muted font-display text-xl">
-                  {initials(person.name)}
+              <span className="flex items-center gap-4">
+                {person.photo ? (
+                  <img src={person.photo} alt="" className="h-16 w-16 shrink-0 rounded-full object-cover object-top" />
+                ) : (
+                  <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-muted font-display text-xl">
+                    {initials(person.name)}
+                  </span>
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className="block font-display text-2xl uppercase leading-none">{person.name}</span>
+                  <span className="mt-1 block text-sm font-semibold">{person.price}</span>
                 </span>
-              )}
-              <span className="min-w-0 flex-1">
-                <span className="block font-display text-2xl uppercase leading-none">{person.name}</span>
-                <span className="mt-1 block text-sm font-semibold">{person.price}</span>
               </span>
+              <span className={choiceAction}>{path === "intro" ? "Continue to checkout" : "See the schedule"}</span>
             </button>
           ))}
         </div>
