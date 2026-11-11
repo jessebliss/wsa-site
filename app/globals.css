@@ -5,6 +5,7 @@
   --foreground: #161616;
   --card: #ffffff;
   --primary: #c4121a;
+  --primary-dark: #a70f16;
   --primary-foreground: #ffffff;
   --muted: #efe8dc;
   --muted-foreground: #5c564c;
@@ -19,6 +20,7 @@
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-dark);
   --color-primary-foreground: var(--primary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);

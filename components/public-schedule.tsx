@@ -416,9 +416,9 @@ export function PublicSchedule({
   const openHourIds = new Set(dayHours.flatMap((slot) => (slot.sessionId ? [slot.sessionId] : [])));
   const dayExtras = coachBlocks.filter((event) => event.dayKey === day && !openHourIds.has(event.id));
   const choiceClass =
-    "group flex min-h-44 w-full cursor-pointer flex-col rounded-2xl border-2 border-ink bg-background px-5 py-5 text-left hover:border-primary hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:border-primary active:bg-muted";
+    "group flex min-h-44 w-full cursor-pointer flex-col rounded-2xl border border-black/15 bg-background px-5 py-5 text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:bg-muted";
   const choiceAction =
-    "pointer-events-none mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-ink px-5 text-center text-base font-semibold text-white";
+    "pointer-events-none mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-primary px-5 text-center text-base font-semibold text-white group-hover:bg-primary-dark group-active:bg-primary-dark";
 
   return (
     <section id="schedule" className="mt-6 scroll-mt-24" data-step={stage}>
