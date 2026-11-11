@@ -51,7 +51,7 @@ export function DayEventsPanel({ dayKey, events }: { dayKey: string; events: Cal
                 {event.href ? (
                   <Link href={event.href} className="group block min-h-11 px-5 py-5 hover:bg-muted" data-book={book ? "yes" : undefined}>
                     {body}
-                    <p className="mt-4 border-t-2 border-primary pt-3 text-base font-semibold text-ink">{book ? "Book this time" : "Open"}</p>
+                    <p className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-ink px-5 text-center text-base font-semibold text-white">{book ? "Book this time" : "Open"}</p>
                   </Link>
                 ) : (
                   <div className="px-5 py-5">{body}</div>

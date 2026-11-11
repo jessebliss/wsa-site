@@ -418,7 +418,7 @@ export function PublicSchedule({
   const choiceClass =
     "group flex min-h-44 w-full cursor-pointer flex-col rounded-2xl border-2 border-ink bg-background px-5 py-5 text-left hover:border-primary hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:border-primary active:bg-muted";
   const choiceAction =
-    "mt-auto border-t-2 border-primary pt-4 text-base font-semibold text-ink";
+    "pointer-events-none mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-ink px-5 text-center text-base font-semibold text-white";
 
   return (
     <section id="schedule" className="mt-6 scroll-mt-24" data-step={stage}>
