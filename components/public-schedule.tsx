@@ -416,6 +416,8 @@ export function PublicSchedule({
   const openHourIds = new Set(dayHours.flatMap((slot) => (slot.sessionId ? [slot.sessionId] : [])));
   const dayExtras = coachBlocks.filter((event) => event.dayKey === day && !openHourIds.has(event.id));
   const cardClass = "flex min-h-44 flex-col rounded-2xl bg-white px-5 py-5 text-left";
+  const choiceClass =
+    "flex min-h-48 w-full cursor-pointer flex-col overflow-hidden rounded-2xl border-2 border-ink bg-background text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:bg-muted";
 
   return (
     <section id="schedule" className="mt-6 scroll-mt-24" data-step={stage}>
@@ -453,22 +455,30 @@ export function PublicSchedule({
       {stage === "home" ? (
         <>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <button type="button" data-choice="new" onClick={() => { setPath("intro"); setStage("intro"); }} className={cardClass}>
-              <span className="block font-display text-3xl uppercase leading-none">New quarterback</span>
-              <span className="mt-3 block text-sm leading-snug text-muted-foreground">
-                Start with the introduction session. {formatMoney(INTRO_PRICE_CENTS)}.
+            <button type="button" data-choice="new" onClick={() => { setPath("intro"); setStage("intro"); }} className={choiceClass}>
+              <span className="flex flex-1 flex-col px-5 py-5">
+                <span className="block font-display text-3xl uppercase leading-none">New quarterback</span>
+                <span className="mt-3 block text-sm leading-snug text-muted-foreground">
+                  Start with the introduction session. {formatMoney(INTRO_PRICE_CENTS)}.
+                </span>
               </span>
-              <span className="mt-4 block text-sm font-semibold text-primary">Introduction session</span>
+              <span className="flex min-h-12 items-center justify-center bg-primary px-5 text-center text-base font-semibold text-white">
+                Introduction session
+              </span>
             </button>
-            <button type="button" data-choice="existing" onClick={() => setStage("trainings")} className={cardClass}>
-              <span className="block font-display text-3xl uppercase leading-none">Existing client</span>
-              <span className="mt-3 block text-sm leading-snug text-muted-foreground">
-                Pick the training you already do, then a coach and a time.
+            <button type="button" data-choice="existing" onClick={() => setStage("trainings")} className={choiceClass}>
+              <span className="flex flex-1 flex-col px-5 py-5">
+                <span className="block font-display text-3xl uppercase leading-none">Existing client</span>
+                <span className="mt-3 block text-sm leading-snug text-muted-foreground">
+                  Pick the training you already do, then a coach and a time.
+                </span>
               </span>
-              <span className="mt-4 block text-sm font-semibold text-primary">Choose a training</span>
+              <span className="flex min-h-12 items-center justify-center bg-primary px-5 text-center text-base font-semibold text-white">
+                Choose a training
+              </span>
             </button>
           </div>
-            <div id="plans" className="mt-8 scroll-mt-24">
+          <div id="plans" className="mt-8 scroll-mt-24">
             <h2 className="font-display text-4xl uppercase leading-none">Plans</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {landingPlans.map((plan) => (
@@ -477,14 +487,18 @@ export function PublicSchedule({
                   href={`/sessions/${plan.id}`}
                   data-plan={plan.name}
                   data-yearly={plan.yearly ? "yes" : undefined}
-                  className={cardClass}
+                  className={choiceClass}
                 >
-                  <span className="block font-display text-3xl uppercase leading-none">{plan.name}</span>
-                  <span className="mt-3 block font-display text-4xl leading-none">
-                    {plan.priceLabel}<span className="text-base"> {plan.cadence}</span>
+                  <span className="flex flex-1 flex-col px-5 py-5">
+                    <span className="block font-display text-3xl uppercase leading-none">{plan.name}</span>
+                    <span className="mt-3 block font-display text-4xl leading-none">
+                      {plan.priceLabel}<span className="text-base"> {plan.cadence}</span>
+                    </span>
+                    <span className="mt-3 block text-sm leading-snug text-muted-foreground">{plan.detail}</span>
                   </span>
-                  <span className="mt-3 block text-sm leading-snug text-muted-foreground">{plan.detail}</span>
-                  <span className="mt-4 block text-sm font-semibold text-primary">Continue to checkout</span>
+                  <span className="flex min-h-12 items-center justify-center bg-primary px-5 text-center text-base font-semibold text-white">
+                    Continue to checkout
+                  </span>
                 </Link>
               ))}
             </div>
