@@ -212,6 +212,7 @@ export function PublicSchedule({
   speedPrices = {},
   savedPrivatePrices = {},
   coachEmails = {},
+  flagPrices = {},
   plans = [],
   types = [],
   landingPlans = [],
@@ -230,6 +231,7 @@ export function PublicSchedule({
   speedPrices?: Record<string, number>;
   savedPrivatePrices?: Record<string, number>;
   coachEmails?: Record<string, string>;
+  flagPrices?: Record<string, { quarterback: number | null; athlete: number | null }>;
   plans?: PlanColorSource[];
   types?: ScheduleType[];
   landingPlans?: LandingPlanCard[];
@@ -253,6 +255,7 @@ export function PublicSchedule({
   const [stage, setStage] = useState<Stage>(opened);
   const [path, setPath] = useState<PathKey>(startingCoach ? linkedPath : opened === "coach" || opened === "intro" ? "intro" : "group");
   const [coach, setCoach] = useState(startingCoach);
+  const [flagRole, setFlagRole] = useState<"" | "quarterback" | "athlete">("");
   const [month, setMonth] = useState(currentMonth);
   const [day, setDay] = useState("");
 
@@ -322,6 +325,7 @@ export function PublicSchedule({
   function pickTraining(next: Exclude<PathKey, "intro">) {
     if (next !== path) {
       setCoach("");
+      setFlagRole("");
       setDay("");
       setMonth(currentMonth);
     }
@@ -329,16 +333,17 @@ export function PublicSchedule({
     setStage("coach");
   }
 
-  function pickCoach(name: string) {
+  function pickCoach(name: string, role?: "quarterback" | "athlete") {
     if (isPlaceholderCoach(name)) return;
     if (path === "intro") {
       window.location.assign(`/book/intro?coach=${encodeURIComponent(name)}`);
       return;
     }
-    if (name !== coach) {
+    if (name !== coach || (role ?? "") !== flagRole) {
       setDay("");
       setMonth(currentMonth);
     }
+    setFlagRole(path === "flag" ? role ?? "" : "");
     setCoach(name);
     setStage("calendar");
   }
@@ -408,19 +413,34 @@ export function PublicSchedule({
       .map((session) => {
         const block = sessionBlock(session, plans);
         if (session.status === "CANCELED") return block;
+        const flagCents =
+          path === "flag"
+            ? flagRole === "quarterback"
+              ? flagPrices[coach]?.quarterback
+              : flagRole === "athlete"
+                ? flagPrices[coach]?.athlete
+                : null
+            : null;
         const price =
-          path === "speed" && speedPrices[coach] != null
-            ? speedPrices[coach]
-            : isPrivateQuarterback(session) && savedPrivatePrices[coach] != null
-              ? savedPrivatePrices[coach]
-              : session.priceCents;
+          path === "flag"
+            ? flagCents
+            : path === "speed" && speedPrices[coach] != null
+              ? speedPrices[coach]
+              : isPrivateQuarterback(session) && savedPrivatePrices[coach] != null
+                ? savedPrivatePrices[coach]
+                : session.priceCents;
         const spots = session.spotsLeft;
+        const spotsLabel = `${spots} spot${spots === 1 ? "" : "s"} left`;
         return {
           ...block,
-          note: `${formatMoney(price)} · ${spots} spot${spots === 1 ? "" : "s"} left`,
+          href:
+            path === "flag" && flagRole
+              ? `/book/${session.id}?${new URLSearchParams({ role: flagRole, coach }).toString()}`
+              : block.href,
+          note: price != null ? `${formatMoney(price)} · ${spotsLabel}` : spotsLabel,
         };
       });
-  }, [sessions, coach, path, plans, speedPrices, savedPrivatePrices, onThisCoach]);
+  }, [sessions, coach, path, flagRole, flagPrices, plans, speedPrices, savedPrivatePrices, onThisCoach]);
   const openHourIds = new Set(dayHours.flatMap((slot) => (slot.sessionId ? [slot.sessionId] : [])));
   const dayExtras = coachBlocks.filter((event) => event.dayKey === day && !openHourIds.has(event.id));
   const choiceClass =
@@ -456,6 +476,9 @@ export function PublicSchedule({
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Selected coach</p>
             <p className="font-display text-3xl uppercase leading-none">{coach}</p>
+            {path === "flag" && flagRole ? (
+              <p className="mt-1 text-sm font-semibold">{flagRole === "quarterback" ? "Quarterback" : "Athlete"}</p>
+            ) : null}
             <p className="mt-1 text-sm">You&apos;re on {possessive(coach)} calendar.</p>
           </div>
         </div>
@@ -529,10 +552,59 @@ export function PublicSchedule({
         </div>
       ) : null}
 
-      {stage === "coach" && coachCards.length === 0 ? (
+      {stage === "coach" && path === "flag" ? (
+        <div className="mt-4 space-y-6">
+          {(["quarterback", "athlete"] as const).map((role) => {
+            const people = coachesForPath.filter((person) => {
+              const cents = role === "quarterback" ? flagPrices[person.name]?.quarterback : flagPrices[person.name]?.athlete;
+              return cents != null && cents > 0;
+            });
+            return (
+              <section key={role}>
+                <h3 className="font-display text-2xl uppercase">{role === "quarterback" ? "Quarterback" : "Athlete"}</h3>
+                {people.length === 0 ? (
+                  <p className="mt-3 rounded-2xl bg-white p-5 text-sm text-muted-foreground">None are on the calendar yet.</p>
+                ) : (
+                  <div className="mt-3 grid gap-3">
+                    {people.map((person) => (
+                      <button
+                        key={`${role}-${person.name}`}
+                        type="button"
+                        data-coach={person.name}
+                        data-flag-role={role}
+                        aria-pressed={person.name === coach && flagRole === role}
+                        onClick={() => pickCoach(person.name, role)}
+                        className={choiceClass}
+                      >
+                        <span className="flex items-center gap-4">
+                          {person.photo ? (
+                            <img src={person.photo} alt="" className="h-16 w-16 shrink-0 rounded-full object-cover object-top" />
+                          ) : (
+                            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-muted font-display text-xl">
+                              {initials(person.name)}
+                            </span>
+                          )}
+                          <span className="min-w-0 flex-1">
+                            <span className="block font-display text-2xl uppercase leading-none">{person.name}</span>
+                            {person.email ? (
+                              <span className="mt-1 block text-sm font-normal normal-case tracking-normal text-muted-foreground">{person.email}</span>
+                            ) : null}
+                          </span>
+                        </span>
+                        <span className={choiceAction}>See the schedule</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
+      ) : null}
+      {stage === "coach" && path !== "flag" && coachCards.length === 0 ? (
         <p className="mt-4 rounded-2xl bg-white p-5 text-sm text-muted-foreground">None are on the calendar yet.</p>
       ) : null}
-      {stage === "coach" && coachCards.length > 0 ? (
+      {stage === "coach" && path !== "flag" && coachCards.length > 0 ? (
         <div className="mt-4 grid gap-3">
           {coachCards.map((person) => (
             <button

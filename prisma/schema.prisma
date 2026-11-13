@@ -302,6 +302,8 @@ model CoachPrice {
   coachName               String   @id
   privateQuarterbackCents Int?
   speedCents              Int?
+  flagQuarterbackCents    Int?
+  flagAthleteCents        Int?
   updatedAt               DateTime @updatedAt
 
   @@map("coach_prices")

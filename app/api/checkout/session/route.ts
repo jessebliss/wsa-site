@@ -13,6 +13,7 @@ import {
 import { chargeLines, checkoutLineItems } from "@/lib/fees";
 import { loadCheckoutFees } from "@/lib/fees-data";
 import { INTRO_CHECKOUT_ID, INTRO_LABEL, INTRO_PRICE_CENTS } from "@/lib/intro";
+import { girlsFlagChargeCents, isGirlsFlagProgram, parseFlagRole } from "@/lib/girls-flag";
 import { listedSessionPrice } from "@/lib/private-quarterback-data";
 import { coachAllowsSession } from "@/lib/openings";
 import { isPlaceholderCoach } from "@/lib/schedule-filter";
@@ -24,8 +25,20 @@ import { appUrl } from "@/lib/utils";
 import { formatMoney } from "@/lib/money";
 import type { TrainingSession } from "@prisma/client";
 
-async function priceOneTime(session: TrainingSession, promoCode?: string | null) {
-  const listPrice = await listedSessionPrice(session);
+async function priceOneTime(
+  session: TrainingSession,
+  promoCode?: string | null,
+  flag?: { role: string | null | undefined; coach: string | null | undefined },
+) {
+  let listPrice = await listedSessionPrice(session);
+  if (isGirlsFlagProgram(session.program)) {
+    const role = parseFlagRole(flag?.role);
+    const coach = flag?.coach?.trim() ?? "";
+    if (!role || !coach) throw new Error("Choose Quarterback or Athlete.");
+    const rolePrice = await girlsFlagChargeCents(session, role, coach);
+    if (rolePrice == null) throw new Error("That coach does not have a price for this choice.");
+    listPrice = rolePrice;
+  }
   let sessionCents = listPrice;
   let promoName = "";
   const promo = promoCode ? await findActivePromo(promoCode) : null;
@@ -102,6 +115,8 @@ const bodySchema = personSchema.extend({
   sessionId: z.string().min(1),
   promoCode: z.string().trim().max(40).optional().or(z.literal("")),
   intent: z.enum(["quote", "book"]).default("book"),
+  flagRole: z.string().optional(),
+  coachName: z.string().optional(),
 });
 
 export async function POST(request: Request) {
@@ -119,6 +134,8 @@ export async function POST(request: Request) {
         sessionId: z.string().min(1),
         email: z.string().optional(),
         promoCode: z.string().optional(),
+        flagRole: z.string().optional(),
+        coachName: z.string().optional(),
       })
       .safeParse(payload);
     if (!rough.success) return NextResponse.json({ error: "Check the form and try again." }, { status: 400 });
@@ -148,7 +165,10 @@ export async function POST(request: Request) {
           return NextResponse.json({ covered: true, amountCents: 0, lines: [], message: preview.message });
         }
       }
-      const priced = await priceOneTime(session, rough.data.promoCode);
+      const priced = await priceOneTime(session, rough.data.promoCode, {
+        role: rough.data.flagRole,
+        coach: rough.data.coachName,
+      });
       return NextResponse.json({
         covered: false,
         amountCents: priced.charge.totalCents,
@@ -227,7 +247,10 @@ export async function POST(request: Request) {
       }
     }
 
-    const priced = await priceOneTime(session, input.promoCode);
+    const priced = await priceOneTime(session, input.promoCode, {
+      role: input.flagRole,
+      coach: input.coachName,
+    });
     if (priced.charge.totalCents === 0) {
       const held = await holdOneTime(session.id, person, priced.promo, priced.charge);
       await prisma.registration.update({

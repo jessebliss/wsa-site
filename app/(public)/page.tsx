@@ -7,6 +7,7 @@ import { ensureLandingPlans } from "@/lib/landing-plans";
 import { loadOpenings } from "@/lib/openings";
 import { PRIVATE_QUARTERBACK_KEY, SPEED_PROGRAM, isPrivateQuarterback, matchCoachName } from "@/lib/private-quarterback";
 import { loadCoachDisplayEmails } from "@/lib/coach-directory";
+import { loadFlagRolePrices } from "@/lib/girls-flag";
 import { loadPrivateQuarterbackPrices, loadSavedPrivatePrices, loadSavedSpeedPrices, privateQuarterbackCoachNames } from "@/lib/private-quarterback-data";
 import { isPlaceholderCoach, parentCoachNames } from "@/lib/schedule-filter";
 import { etDayKey, etToUtc, shiftMonth } from "@/lib/time";
@@ -82,11 +83,12 @@ export default async function SchedulePage({
   const speedType = types.find((type) => type.offeringKey === `program:${SPEED_PROGRAM}`);
   const privateType = types.find((type) => type.offeringKey === PRIVATE_QUARTERBACK_KEY);
   const initialTypeId = wantsSpeed && linkedCoach ? speedType?.id ?? "" : wantsQuarterback && linkedCoach ? privateType?.id ?? "" : "";
-  const [privatePrices, speedPrices, savedPrivatePrices, coachEmails] = await Promise.all([
+  const [privatePrices, speedPrices, savedPrivatePrices, coachEmails, flagPrices] = await Promise.all([
     loadPrivateQuarterbackPrices(privateCoachNames),
     loadSavedSpeedPrices(),
     loadSavedPrivatePrices(),
     loadCoachDisplayEmails(),
+    loadFlagRolePrices(),
   ]);
 
   return (
@@ -130,6 +132,7 @@ export default async function SchedulePage({
             : `${plan.sessionsPerMonth} group times each month.`,
         }))}
         coachEmails={coachEmails}
+        flagPrices={flagPrices}
         speedPrices={speedPrices}
         savedPrivatePrices={savedPrivatePrices}
         plans={plans.map((plan) => ({

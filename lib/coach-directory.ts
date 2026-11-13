@@ -17,8 +17,11 @@ export type CoachDirectoryEntry = {
   email: string;
   offersPrivate: boolean;
   offersSpeed: boolean;
+  offersFlag: boolean;
   privateCents: number | null;
   speedCents: number | null;
+  flagQuarterbackCents: number | null;
+  flagAthleteCents: number | null;
   viewPath: string;
   showQr: boolean;
 };
@@ -58,7 +61,12 @@ export async function loadCoachDirectory() {
     }),
     prisma.retiredCoach.findMany({ select: { coachName: true } }),
     prisma.trainingSession.findMany({
-      where: { program: { in: [SPEED_PROGRAM, QUARTERBACK_PROGRAM] } },
+      where: {
+        OR: [
+          { program: { in: [SPEED_PROGRAM, QUARTERBACK_PROGRAM] } },
+          { program: { contains: "flag", mode: "insensitive" } },
+        ],
+      },
       select: { coach: true, coaches: true, kind: true, program: true, priceCents: true, startsAt: true },
       orderBy: { startsAt: "desc" },
     }),
@@ -75,6 +83,7 @@ export async function loadCoachDirectory() {
   for (const coach of coaches) qrNames.add(coach.coachName);
 
   const speedNames = new Set<string>();
+  const flagNames = new Set<string>();
   const privateNames = new Set<string>(
     (QUARTERBACK_COACHES as readonly string[]).filter((name) => !retiredNames.has(name)),
   );
@@ -90,6 +99,9 @@ export async function loadCoachDirectory() {
     if (session.kind === "PRIVATE" && session.program === QUARTERBACK_PROGRAM) {
       for (const name of names) privateNames.add(name);
     }
+    if (/flag/i.test(session.program)) {
+      for (const name of names) flagNames.add(name);
+    }
   }
 
   const savedByName = new Map(savedPrices.map((row) => [row.coachName, row]));
@@ -102,7 +114,7 @@ export async function loadCoachDirectory() {
   const logins = new Map(coaches.map((coach) => [coach.coachName, coach]));
   const profileEmails = new Map(profiles.map((row) => [row.coachName, row.email]));
   const ordered: string[] = [...QUARTERBACK_COACHES];
-  for (const name of [...priceNames, ...qrNames, ...coaches.map((coach) => coach.coachName)]) {
+  for (const name of [...priceNames, ...flagNames, ...qrNames, ...coaches.map((coach) => coach.coachName)]) {
     if (!ordered.includes(name)) ordered.push(name);
   }
 
@@ -111,14 +123,18 @@ export async function loadCoachDirectory() {
     const saved = savedByName.get(coachName);
     const offersPrivate = privateNames.has(coachName);
     const offersSpeed = speedNames.has(coachName);
+    const offersFlag = flagNames.has(coachName);
     return {
       coachName,
       login: login ? { id: login.id, name: login.name, email: login.email } : null,
       email: coachDisplayEmail(profileEmails.get(coachName), login?.email),
       offersPrivate,
       offersSpeed,
+      offersFlag,
       privateCents: offersPrivate ? (saved?.privateQuarterbackCents ?? privateShown[coachName] ?? null) : null,
       speedCents: offersSpeed ? (saved?.speedCents ?? latestSpeedCents.get(coachName) ?? null) : null,
+      flagQuarterbackCents: saved?.flagQuarterbackCents ?? null,
+      flagAthleteCents: saved?.flagAthleteCents ?? null,
       viewPath: offersPrivate
         ? privateBookingPath(coachName)
         : `/?${new URLSearchParams({ training: "speed", coach: coachName }).toString()}`,

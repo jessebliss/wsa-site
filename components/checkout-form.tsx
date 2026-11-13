@@ -19,6 +19,8 @@ export function CheckoutForm({
   allowPromo,
   intake = "session",
   coachName = "",
+  flagRole = "",
+  flagCoach = "",
 }: {
   sessionId: string;
   priceCents: number;
@@ -27,6 +29,8 @@ export function CheckoutForm({
   allowPromo: boolean;
   intake?: "session" | "intro";
   coachName?: string;
+  flagRole?: "" | "quarterback" | "athlete";
+  flagCoach?: string;
 }) {
   const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState("");
@@ -49,6 +53,7 @@ export function CheckoutForm({
         sessionId,
         email: String(data.get("email") ?? ""),
         promoCode: String(data.get("promoCode") ?? ""),
+        ...(flagRole ? { flagRole, coachName: flagCoach } : {}),
       }),
     });
     const body = (await response.json()) as {
@@ -86,7 +91,8 @@ export function CheckoutForm({
         school: data.get("school"),
         grade: data.get("grade"),
         social: data.get("social"),
-        coachName: data.get("coachName"),
+        coachName: flagRole ? flagCoach : data.get("coachName"),
+        flagRole: flagRole || undefined,
         promoCode: data.get("promoCode"),
         acceptWaiver: accepted,
       }),

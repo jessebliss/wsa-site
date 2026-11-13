@@ -46,7 +46,7 @@ export default async function CoachEditPage({
         </div>
         <Button className="mt-3" type="submit">Save email</Button>
       </form>
-      {coach.offersPrivate || coach.offersSpeed ? (
+      {coach.offersPrivate || coach.offersSpeed || coach.offersFlag ? (
         <form action={saveCoachPrices} className="mt-6 rounded-2xl bg-white p-4" data-coach-price={coach.coachName}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <h2 className="font-display text-2xl uppercase">Prices</h2>
@@ -83,7 +83,36 @@ export default async function CoachEditPage({
                 />
               </div>
             ) : null}
+            {coach.offersFlag ? (
+              <div>
+                <Label htmlFor="flagQuarterback">Girls flag quarterback (USD)</Label>
+                <Input
+                  className="mt-1"
+                  id="flagQuarterback"
+                  name="flagQuarterback"
+                  inputMode="decimal"
+                  defaultValue={coach.flagQuarterbackCents != null ? centsToDollarInput(coach.flagQuarterbackCents) : ""}
+                />
+              </div>
+            ) : null}
+            {coach.offersFlag ? (
+              <div>
+                <Label htmlFor="flagAthlete">Girls flag athlete (USD)</Label>
+                <Input
+                  className="mt-1"
+                  id="flagAthlete"
+                  name="flagAthlete"
+                  inputMode="decimal"
+                  defaultValue={coach.flagAthleteCents != null ? centsToDollarInput(coach.flagAthleteCents) : ""}
+                />
+              </div>
+            ) : null}
           </div>
+          {coach.offersFlag ? (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Leave a girls flag price blank to keep this coach off that choice. The amount shows on the schedule and at checkout, not on the coach card.
+            </p>
+          ) : null}
           <Button className="mt-3" type="submit">Save prices</Button>
         </form>
       ) : null}

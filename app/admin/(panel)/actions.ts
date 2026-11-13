@@ -92,14 +92,32 @@ export async function saveCoachPrices(formData: FormData) {
   const coachName = String(formData.get("coachName") ?? "").trim();
   try {
     if (!coachName) throw new Error("Choose a coach.");
-    const data: { privateQuarterbackCents?: number; speedCents?: number } = {};
+    const data: {
+      privateQuarterbackCents?: number;
+      speedCents?: number;
+      flagQuarterbackCents?: number | null;
+      flagAthleteCents?: number | null;
+    } = {};
     if (formData.has("privateQuarterback")) {
       data.privateQuarterbackCents = dollarsToCents(String(formData.get("privateQuarterback") ?? ""));
     }
     if (formData.has("speed")) {
       data.speedCents = dollarsToCents(String(formData.get("speed") ?? ""));
     }
-    if (data.privateQuarterbackCents == null && data.speedCents == null) {
+    if (formData.has("flagQuarterback")) {
+      const raw = String(formData.get("flagQuarterback") ?? "").trim();
+      data.flagQuarterbackCents = raw ? dollarsToCents(raw) : null;
+    }
+    if (formData.has("flagAthlete")) {
+      const raw = String(formData.get("flagAthlete") ?? "").trim();
+      data.flagAthleteCents = raw ? dollarsToCents(raw) : null;
+    }
+    if (
+      data.privateQuarterbackCents == null &&
+      data.speedCents == null &&
+      data.flagQuarterbackCents === undefined &&
+      data.flagAthleteCents === undefined
+    ) {
       throw new Error("Nothing to save for this coach.");
     }
     await prisma.coachPrice.upsert({
