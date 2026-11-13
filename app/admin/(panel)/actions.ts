@@ -115,6 +115,27 @@ export async function saveCoachPrices(formData: FormData) {
   redirect(`/admin/coaches/${encodeURIComponent(coachName)}?saved=1`);
 }
 
+export async function saveCoachEmail(formData: FormData) {
+  await requireAdmin();
+  const coachName = String(formData.get("coachName") ?? "").trim();
+  try {
+    if (!coachName) throw new Error("Choose a coach.");
+    const raw = String(formData.get("email") ?? "").trim();
+    const email = raw ? normalizeEmail(raw) : null;
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a real email address.");
+    await prisma.coachProfile.upsert({
+      where: { coachName },
+      create: { coachName, email },
+      update: { email },
+    });
+  } catch (error) {
+    fail(coachName ? `/admin/coaches/${encodeURIComponent(coachName)}` : "/admin/coaches", error);
+  }
+  revalidatePath("/");
+  revalidatePath("/admin/coaches");
+  redirect(`/admin/coaches/${encodeURIComponent(coachName)}?saved=email`);
+}
+
 export type CoachDaySave =
   | { ok: true; dayKey: string; unavailable: boolean; hours: number[] }
   | { ok: false; error: string };

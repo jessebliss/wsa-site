@@ -13,6 +13,8 @@ export type CoachLogin = {
 export type CoachDirectoryEntry = {
   coachName: string;
   login: CoachLogin | null;
+  /** Saved coach email, or the staff login when that is the only address. */
+  email: string;
   offersPrivate: boolean;
   offersSpeed: boolean;
   privateCents: number | null;
@@ -21,9 +23,32 @@ export type CoachDirectoryEntry = {
   showQr: boolean;
 };
 
+export function coachDisplayEmail(saved: string | null | undefined, login: string | null | undefined) {
+  const profile = saved?.trim() ?? "";
+  if (profile) return profile;
+  return login?.trim() ?? "";
+}
+
+export async function loadCoachDisplayEmails() {
+  const [profiles, staff] = await Promise.all([
+    prisma.coachProfile.findMany(),
+    prisma.staffUser.findMany({ select: { coachName: true, email: true } }),
+  ]);
+  const emails: Record<string, string> = {};
+  for (const row of staff) {
+    const login = row.email.trim();
+    if (login) emails[row.coachName] = login;
+  }
+  for (const row of profiles) {
+    const saved = row.email?.trim() ?? "";
+    if (saved) emails[row.coachName] = saved;
+  }
+  return emails;
+}
+
 export async function loadCoachDirectory() {
   const origin = await publicOrigin();
-  const [coaches, scheduleCoaches, retired, pricedSessions, savedPrices] = await Promise.all([
+  const [coaches, scheduleCoaches, retired, pricedSessions, savedPrices, profiles] = await Promise.all([
     prisma.staffUser.findMany({ orderBy: { name: "asc" } }),
     prisma.trainingSession.findMany({
       where: { coach: { not: null } },
@@ -38,6 +63,7 @@ export async function loadCoachDirectory() {
       orderBy: { startsAt: "desc" },
     }),
     prisma.coachPrice.findMany(),
+    prisma.coachProfile.findMany(),
   ]);
 
   const scheduleNames = scheduleCoaches.map((session) => session.coach).filter((name): name is string => Boolean(name));
@@ -74,6 +100,7 @@ export async function loadCoachDirectory() {
   const privateShown = await loadPrivateQuarterbackPrices(priceNames.filter((name) => privateNames.has(name)));
 
   const logins = new Map(coaches.map((coach) => [coach.coachName, coach]));
+  const profileEmails = new Map(profiles.map((row) => [row.coachName, row.email]));
   const ordered: string[] = [...QUARTERBACK_COACHES];
   for (const name of [...priceNames, ...qrNames, ...coaches.map((coach) => coach.coachName)]) {
     if (!ordered.includes(name)) ordered.push(name);
@@ -87,6 +114,7 @@ export async function loadCoachDirectory() {
     return {
       coachName,
       login: login ? { id: login.id, name: login.name, email: login.email } : null,
+      email: coachDisplayEmail(profileEmails.get(coachName), login?.email),
       offersPrivate,
       offersSpeed,
       privateCents: offersPrivate ? (saved?.privateQuarterbackCents ?? privateShown[coachName] ?? null) : null,

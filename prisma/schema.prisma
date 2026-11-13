@@ -307,6 +307,14 @@ model CoachPrice {
   @@map("coach_prices")
 }
 
+model CoachProfile {
+  coachName String   @id
+  email     String?
+  updatedAt DateTime @updatedAt
+
+  @@map("coach_profiles")
+}
+
 model RetiredCoach {
   id        String   @id @default(cuid())
   coachName String   @unique

@@ -62,7 +62,7 @@ export default async function CoachesPage({
           <li key={coach.coachName} className="flex items-center gap-3 rounded-xl bg-white p-3" data-coach-row={coach.coachName}>
             <Link href={coachEditPath(coach.coachName)} className="min-w-0 flex-1 py-1">
               <p className="font-semibold">{coach.login?.name ?? coach.coachName}</p>
-              {coach.login ? <p className="text-sm text-muted-foreground">{coach.login.email}</p> : null}
+              {coach.email ? <p className="text-sm text-muted-foreground">{coach.email}</p> : null}
               <p className="text-sm">Parents see {coach.coachName}</p>
             </Link>
             <ConfirmForm

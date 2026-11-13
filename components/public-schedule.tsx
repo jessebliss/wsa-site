@@ -211,6 +211,7 @@ export function PublicSchedule({
   initialStage = "home",
   speedPrices = {},
   savedPrivatePrices = {},
+  coachEmails = {},
   plans = [],
   types = [],
   landingPlans = [],
@@ -228,6 +229,7 @@ export function PublicSchedule({
   initialStage?: "home" | "intro" | "intro-coach" | "trainings";
   speedPrices?: Record<string, number>;
   savedPrivatePrices?: Record<string, number>;
+  coachEmails?: Record<string, string>;
   plans?: PlanColorSource[];
   types?: ScheduleType[];
   landingPlans?: LandingPlanCard[];
@@ -272,13 +274,13 @@ export function PublicSchedule({
       }
     }
     return Array.from(prices.entries())
-      .map(([name, cents]) => ({ name, price: priceLabel(cents), photo: portraits[name] ?? "" }))
+      .map(([name, cents]) => ({ name, price: priceLabel(cents), photo: portraits[name] ?? "", email: coachEmails[name]?.trim() ?? "" }))
       .sort((a, b) => {
         const ai = order.indexOf(a.name);
         const bi = order.indexOf(b.name);
         return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi) || a.name.localeCompare(b.name);
       });
-  }, [activePath, activeTypeId, bookable, portraits, speedPrices]);
+  }, [activePath, activeTypeId, bookable, portraits, speedPrices, coachEmails]);
 
   const privateBooking = path === "private";
   const usesAvailability = privateBooking && coachHasLogin(openings, coach);
@@ -385,9 +387,15 @@ export function PublicSchedule({
     name: person.name,
     price: formatMoney(INTRO_PRICE_CENTS),
     photo: portraits[person.name] ?? "",
+    email: coachEmails[person.name]?.trim() ?? "",
   }));
   const coachCards = path === "intro" ? introCoaches : privateBooking
-    ? privateCoaches.map((person) => ({ name: person.name, price: formatMoney(person.priceCents), photo: portraits[person.name] ?? "" }))
+    ? privateCoaches.map((person) => ({
+        name: person.name,
+        price: formatMoney(person.priceCents),
+        photo: portraits[person.name] ?? "",
+        email: coachEmails[person.name]?.trim() ?? "",
+      }))
     : coachesForPath;
   const coachBlocks = useMemo<CalendarBlock[]>(() => {
     if (!coach || path === "intro") return [];
@@ -546,6 +554,9 @@ export function PublicSchedule({
                 )}
                 <span className="min-w-0 flex-1">
                   <span className="block font-display text-2xl uppercase leading-none">{person.name}</span>
+                  {person.email ? (
+                    <span className="mt-1 block text-sm font-normal normal-case tracking-normal text-muted-foreground">{person.email}</span>
+                  ) : null}
                   <span className="mt-1 block text-sm font-semibold">{person.price}</span>
                 </span>
               </span>
