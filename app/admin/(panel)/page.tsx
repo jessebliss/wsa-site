@@ -8,8 +8,8 @@ export default async function AdminHome() {
   const now = new Date();
   const [upcoming, active, pastDue, messages] = await Promise.all([
     prisma.trainingSession.count({ where: { status: "SCHEDULED", startsAt: { gte: now } } }),
-    prisma.subscription.count({ where: { status: "ACTIVE" } }),
-    prisma.subscription.count({ where: { status: "PAST_DUE" } }),
+    prisma.subscription.count({ where: { status: "ACTIVE", paymentMethod: "STRIPE" } }),
+    prisma.subscription.count({ where: { status: "PAST_DUE", paymentMethod: "STRIPE" } }),
     prisma.contactMessage.findMany({ orderBy: { createdAt: "desc" }, take: 5 }),
   ]);
 

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createVenmoMembership, markInvoicePaid, saveInvoiceSequence } from "@/app/admin/(panel)/actions";
+import { markInvoicePaid, saveInvoiceSequence } from "@/app/admin/(panel)/actions";
 import { AdminError } from "@/components/admin-error";
 import { InvoiceForm, type InvoiceActivity } from "@/components/invoice-form";
 import { VenmoPayQr } from "@/components/venmo-pay-qr";
@@ -13,7 +13,7 @@ import { centsToDollarInput, formatMoney } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { subscriptionPlanName } from "@/lib/subscription-admin";
 import { formatEt } from "@/lib/time";
-import { Prisma, type PaymentMethod, type SubscriptionStatus } from "@prisma/client";
+import { Prisma, type SubscriptionStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Billing" };
@@ -44,18 +44,15 @@ export default async function BillingPage({
     id?: string;
     q?: string;
     status?: string;
-    pay?: string;
     plan?: string;
   }>;
 }) {
   const params = await searchParams;
   const q = (params.q ?? "").trim();
   const status = STATUSES.includes(params.status as SubscriptionStatus) ? (params.status as SubscriptionStatus) : "";
-  const pay = params.pay === "STRIPE" || params.pay === "VENMO" ? params.pay : "";
   const plan = params.plan ?? "";
-  const where: Prisma.SubscriptionWhereInput = {};
+  const where: Prisma.SubscriptionWhereInput = { paymentMethod: "STRIPE" };
   if (status) where.status = status;
-  if (pay) where.paymentMethod = pay as PaymentMethod;
   const plansForFilter = await prisma.plan.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }] });
   const planIds = new Set(plansForFilter.map((item) => item.id));
   if (plan === "none") where.planId = null;
@@ -97,13 +94,13 @@ export default async function BillingPage({
       amountCents: session.priceCents,
     })),
   ];
-  const filtering = Boolean(q || status || pay || plan);
+  const filtering = Boolean(q || status || plan);
 
   return (
     <div>
       <h1 className="font-display text-4xl uppercase">Billing</h1>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-        Invoices are numbered in one sequence. Memberships stay on this page, whether they bill through Stripe or Venmo.
+        Invoices are numbered in one sequence. Stripe memberships stay on this page.
       </p>
       <AdminError message={params.error} />
       {params.sent === "1" ? <p className="mt-3 text-sm font-semibold text-primary">Invoice sent. The customer has the Stripe checkout link.</p> : null}
@@ -190,49 +187,8 @@ export default async function BillingPage({
 
       <h2 className="mt-10 font-display text-3xl uppercase">Subscriptions</h2>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-        Card memberships start when a parent checks out. Add a Venmo membership when they pay you directly. Canceling Venmo here does not refund a card.
+        Card memberships start when a parent checks out with Stripe. Venmo and Zelle are one-time invoices.
       </p>
-      <form action={createVenmoMembership} className="mt-4 grid gap-3 rounded-2xl bg-white p-4 sm:grid-cols-2">
-        <h3 className="font-display text-2xl uppercase sm:col-span-2">Add a Venmo subscription</h3>
-        <div>
-          <Label htmlFor="subParentName">Parent name</Label>
-          <Input className="mt-1" id="subParentName" name="parentName" required autoComplete="name" />
-        </div>
-        <div>
-          <Label htmlFor="subEmail">Email</Label>
-          <Input className="mt-1" id="subEmail" name="email" type="email" required autoComplete="off" />
-        </div>
-        <div>
-          <Label htmlFor="subPhone">Phone</Label>
-          <Input className="mt-1" id="subPhone" name="phone" type="tel" required autoComplete="tel" />
-        </div>
-        <div>
-          <Label htmlFor="subPlayerName">Player name</Label>
-          <Input className="mt-1" id="subPlayerName" name="playerName" required />
-        </div>
-        <div>
-          <Label htmlFor="planId">Plan</Label>
-          <select id="planId" name="planId" required className="mt-1 h-11 w-full rounded-md border border-border bg-white px-3" defaultValue="">
-            <option value="" disabled>Choose</option>
-            {plansForFilter.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name} · {formatMoney(item.priceCents)} {item.billingInterval === "YEAR" ? "per year" : "per month"} · {item.sessionsPerMonth <= 0 ? "Unlimited" : `${item.sessionsPerMonth} times`}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <Label htmlFor="price">Price (USD)</Label>
-          <Input className="mt-1" id="price" name="price" required placeholder="80" />
-        </div>
-        <div className="sm:col-span-2">
-          <Label htmlFor="note">Note</Label>
-          <Input className="mt-1" id="note" name="note" placeholder="Optional" />
-        </div>
-        <div className="sm:col-span-2">
-          <Button type="submit">Add Venmo subscription</Button>
-        </div>
-      </form>
       <form className="mt-4 grid gap-3 rounded-2xl bg-white p-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <Label htmlFor="q">Search</Label>
@@ -245,14 +201,6 @@ export default async function BillingPage({
             {STATUSES.map((item) => (
               <option key={item} value={item}>{STATUS_LABEL[item]}</option>
             ))}
-          </select>
-        </div>
-        <div>
-          <Label htmlFor="pay">How they pay</Label>
-          <select id="pay" name="pay" defaultValue={pay} className="mt-1 h-11 w-full rounded-md border border-border bg-white px-3">
-            <option value="">Stripe and Venmo</option>
-            <option value="STRIPE">Stripe</option>
-            <option value="VENMO">Venmo</option>
           </select>
         </div>
         <div>
@@ -281,7 +229,7 @@ export default async function BillingPage({
                 <div>
                   <p className="font-semibold">{sub.playerName}</p>
                   <p className="text-sm text-muted-foreground">{sub.parentName} · {sub.email}</p>
-                  <p className="text-sm text-muted-foreground">{subscriptionPlanName(sub)} · {sub.paymentMethod === "VENMO" ? "Venmo" : "Stripe"}</p>
+                  <p className="text-sm text-muted-foreground">{subscriptionPlanName(sub)} · Stripe</p>
                 </div>
                 <div className="text-right text-sm">
                   <p className="font-semibold">{STATUS_LABEL[sub.status]}</p>

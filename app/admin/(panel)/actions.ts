@@ -26,7 +26,6 @@ import {
   cancelAtPeriodEnd,
   cancelNow,
   changeSubscriptionPlan,
-  createVenmoSubscription,
   pauseSubscription,
   renewSubscription,
   resumeSubscription,
@@ -391,25 +390,6 @@ export async function deletePlan(formData: FormData) {
   revalidatePath("/admin/sessions");
   revalidatePath("/admin/subscriptions");
   redirect("/admin/sessions");
-}
-
-export async function createVenmoMembership(formData: FormData) {
-  await requireAdmin();
-  try {
-    await createVenmoSubscription({
-      parentName: String(formData.get("parentName") ?? ""),
-      email: String(formData.get("email") ?? ""),
-      phone: String(formData.get("phone") ?? ""),
-      playerName: String(formData.get("playerName") ?? ""),
-      planId: String(formData.get("planId") ?? ""),
-      priceCents: dollarsToCents(String(formData.get("price") ?? "")),
-      note: String(formData.get("note") ?? ""),
-    });
-  } catch (error) {
-    fail("/admin/billing", error);
-  }
-  revalidatePath("/admin/billing");
-  redirect("/admin/billing");
 }
 
 export async function createTrainingType(formData: FormData) {

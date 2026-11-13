@@ -2,8 +2,6 @@ import { prisma } from "@/lib/prisma";
 import { ensurePlanStripePrice, mapSubscriptionStatus } from "@/lib/billing";
 import { getStripe } from "@/lib/stripe";
 import { etToUtc } from "@/lib/time";
-import { normalizeEmail } from "@/lib/utils";
-
 export function subscriptionPlanName(sub: { plan: { name: string } | null; planName: string }) {
   return sub.plan?.name || sub.planName || "Deleted plan";
 }
@@ -166,41 +164,6 @@ export async function renewSubscription(id: string) {
       sessionsUsed: 0,
       priceCents: local.plan.priceCents,
       planName: local.plan.name,
-    },
-  });
-}
-
-export async function createVenmoSubscription(input: {
-  parentName: string;
-  email: string;
-  phone: string;
-  playerName: string;
-  planId: string;
-  priceCents: number;
-  note: string;
-}) {
-  const parentName = input.parentName.trim();
-  const playerName = input.playerName.trim();
-  const phone = input.phone.trim();
-  const email = normalizeEmail(input.email);
-  const note = input.note.trim();
-  if (!parentName || !playerName || !phone) throw new Error("Parent, player, and phone are required.");
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a real email address.");
-  const plan = await prisma.plan.findUnique({ where: { id: input.planId } });
-  if (!plan) throw new Error("Choose a session.");
-  return prisma.subscription.create({
-    data: {
-      email,
-      parentName,
-      phone,
-      playerName,
-      planId: plan.id,
-      planName: plan.name,
-      priceCents: input.priceCents,
-      sessionsIncluded: plan.sessionsPerMonth,
-      paymentMethod: "VENMO",
-      note: note || null,
-      status: "ACTIVE",
     },
   });
 }
