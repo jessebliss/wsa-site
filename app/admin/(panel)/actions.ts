@@ -406,10 +406,10 @@ export async function createVenmoMembership(formData: FormData) {
       note: String(formData.get("note") ?? ""),
     });
   } catch (error) {
-    fail("/admin/subscriptions", error);
+    fail("/admin/billing", error);
   }
-  revalidatePath("/admin/subscriptions");
-  redirect("/admin/subscriptions");
+  revalidatePath("/admin/billing");
+  redirect("/admin/billing");
 }
 
 export async function createTrainingType(formData: FormData) {
@@ -594,7 +594,7 @@ function readInvoiceCustomer(formData: FormData) {
 
 export async function createInvoice(formData: FormData) {
   await requireAdmin();
-  let next = "/admin/invoices?sent=1";
+  let next = "/admin/billing?sent=1";
   try {
     const activity = await resolveInvoiceActivity(String(formData.get("activity") ?? ""));
     const amountCents = dollarsToCents(String(formData.get("amount") ?? ""));
@@ -623,12 +623,24 @@ export async function createInvoice(formData: FormData) {
     };
 
     if (method === "venmo") {
-      await saveAdminInvoice({
+      const venmoHandle = String(formData.get("venmoHandle") ?? "").trim().replace(/^@+/, "");
+      const invoice = await saveAdminInvoice({
         ...shared,
         paymentMethod: "VENMO",
         status: "OPEN",
+        venmoHandle: venmoHandle || null,
       });
-      next = "/admin/invoices?sent=venmo";
+      next = `/admin/billing?sent=venmo&id=${invoice.id}`;
+    } else if (method === "zelle") {
+      const zelleRecipient = String(formData.get("zelleRecipient") ?? "").trim();
+      if (!zelleRecipient) throw new Error("Enter the Zelle name, email, or phone.");
+      const invoice = await saveAdminInvoice({
+        ...shared,
+        paymentMethod: "ZELLE",
+        status: "OPEN",
+        zelleRecipient,
+      });
+      next = `/admin/billing?sent=zelle&id=${invoice.id}`;
     } else if (method === "stripe") {
       if (!stripeConfigured()) {
         throw new Error("Stripe is not configured. Add STRIPE_SECRET_KEY before sending an invoice. Nothing was charged.");
@@ -684,14 +696,14 @@ export async function createInvoice(formData: FormData) {
           ].join("\n"),
         );
       }
-      next = canEmail ? "/admin/invoices?sent=1" : `/admin/invoices?sent=link&id=${invoice.id}`;
+      next = canEmail ? "/admin/billing?sent=1" : `/admin/billing?sent=link&id=${invoice.id}`;
     } else {
-      throw new Error("Choose Stripe or Venmo.");
+      throw new Error("Choose Stripe, Venmo, or Zelle.");
     }
   } catch (error) {
-    fail("/admin/invoices", error);
+    fail("/admin/billing", error);
   }
-  revalidatePath("/admin/invoices");
+  revalidatePath("/admin/billing");
   redirect(next);
 }
 
@@ -702,10 +714,10 @@ export async function saveInvoiceSequence(formData: FormData) {
     if (!/^\d+$/.test(raw)) throw new Error("Enter a whole number for the next invoice.");
     await setNextInvoiceNumber(Number(raw));
   } catch (error) {
-    fail("/admin/invoices", error);
+    fail("/admin/billing", error);
   }
-  revalidatePath("/admin/invoices");
-  redirect("/admin/invoices?saved=next");
+  revalidatePath("/admin/billing");
+  redirect("/admin/billing?saved=next");
 }
 
 export async function markInvoicePaid(formData: FormData) {
@@ -713,10 +725,10 @@ export async function markInvoicePaid(formData: FormData) {
   try {
     await markVenmoInvoicePaid(String(formData.get("id") ?? ""));
   } catch (error) {
-    fail("/admin/invoices", error);
+    fail("/admin/billing", error);
   }
-  revalidatePath("/admin/invoices");
-  redirect("/admin/invoices?saved=paid");
+  revalidatePath("/admin/billing");
+  redirect("/admin/billing?saved=paid");
 }
 
 export async function subscriptionAction(formData: FormData) {

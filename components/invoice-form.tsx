@@ -14,6 +14,8 @@ export type InvoiceActivity = {
   amountCents: number | null;
 };
 
+type PayMethod = "stripe" | "venmo" | "zelle";
+
 export function InvoiceForm({
   activities,
   fees,
@@ -28,6 +30,7 @@ export function InvoiceForm({
 }) {
   const [activity, setActivity] = useState("misc");
   const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState<PayMethod>("stripe");
 
   function chooseActivity(value: string) {
     setActivity(value);
@@ -39,6 +42,20 @@ export function InvoiceForm({
 
   return (
     <form action={createInvoice} className="mt-4 grid gap-4 rounded-2xl bg-white p-4 sm:grid-cols-2">
+      <div className="sm:col-span-2">
+        <Label htmlFor="paymentMethod">How it is paid</Label>
+        <select
+          id="paymentMethod"
+          name="paymentMethod"
+          value={method}
+          onChange={(event) => setMethod(event.target.value as PayMethod)}
+          className="mt-1 h-11 w-full rounded-md border border-border bg-white px-3"
+        >
+          <option value="stripe">Stripe</option>
+          <option value="venmo">Venmo</option>
+          <option value="zelle">Zelle</option>
+        </select>
+      </div>
       <div className="sm:col-span-2">
         <Label htmlFor="activity">Activity</Label>
         <select
@@ -67,13 +84,6 @@ export function InvoiceForm({
         <Label htmlFor="amount">Amount (USD)</Label>
         <Input className="mt-1" id="amount" name="amount" inputMode="decimal" required value={amount} onChange={(event) => setAmount(event.target.value)} />
       </div>
-      <div>
-        <Label htmlFor="paymentMethod">How it is paid</Label>
-        <select id="paymentMethod" name="paymentMethod" defaultValue="stripe" className="mt-1 h-11 w-full rounded-md border border-border bg-white px-3">
-          <option value="stripe">Stripe</option>
-          <option value="venmo">Venmo</option>
-        </select>
-      </div>
       <div className="sm:col-span-2">
         <p className="text-sm text-muted-foreground">
           Fees start from the current checkout settings. Changing them here applies to this invoice only.
@@ -96,12 +106,12 @@ export function InvoiceForm({
         <Input className="mt-1" id="taxPercent" name="taxPercent" inputMode="decimal" defaultValue={fees.taxPercent} />
       </div>
       <div>
-        <Label htmlFor="parentName">Parent name</Label>
-        <Input className="mt-1" id="parentName" name="parentName" required autoComplete="name" />
+        <Label htmlFor="invoiceParentName">Parent name</Label>
+        <Input className="mt-1" id="invoiceParentName" name="parentName" required autoComplete="name" />
       </div>
       <div>
-        <Label htmlFor="playerName">Player name</Label>
-        <Input className="mt-1" id="playerName" name="playerName" required />
+        <Label htmlFor="invoicePlayerName">Player name</Label>
+        <Input className="mt-1" id="invoicePlayerName" name="playerName" required />
       </div>
       <div>
         <Label htmlFor="invoiceEmail">Email</Label>
@@ -111,8 +121,21 @@ export function InvoiceForm({
         <Label htmlFor="invoicePhone">Phone</Label>
         <Input className="mt-1" id="invoicePhone" name="phone" type="tel" inputMode="tel" required autoComplete="off" />
       </div>
+      {method === "venmo" ? (
+        <div className="sm:col-span-2">
+          <Label htmlFor="venmoHandle">Venmo handle</Label>
+          <Input className="mt-1" id="venmoHandle" name="venmoHandle" placeholder="@username" autoComplete="off" />
+          <p className="mt-1 text-sm text-muted-foreground">Leave this blank to save the invoice without a Venmo code.</p>
+        </div>
+      ) : null}
+      {method === "zelle" ? (
+        <div className="sm:col-span-2">
+          <Label htmlFor="zelleRecipient">Zelle recipient</Label>
+          <Input className="mt-1" id="zelleRecipient" name="zelleRecipient" required placeholder="Name, email, or phone" autoComplete="off" />
+        </div>
+      ) : null}
       <div className="sm:col-span-2">
-        <Button type="submit">Send invoice</Button>
+        <Button type="submit">{method === "stripe" ? "Send invoice" : "Save invoice"}</Button>
       </div>
     </form>
   );

@@ -77,13 +77,27 @@ type InvoiceWrite = {
   registrationCents: number;
   taxCents: number;
   totalCents: number;
-  paymentMethod: "STRIPE" | "VENMO";
+  paymentMethod: "STRIPE" | "VENMO" | "ZELLE";
   status: "OPEN" | "PAID";
   source: string;
   stripeCheckoutSessionId?: string | null;
   checkoutUrl?: string | null;
+  venmoHandle?: string | null;
+  zelleRecipient?: string | null;
   paidAt?: Date | null;
 };
+
+/** Public Venmo pay link. The note is the invoice number. */
+export function venmoPayUrl(handle: string, totalCents: number, invoiceNumber: number) {
+  const recipients = handle.trim().replace(/^@+/, "");
+  const params = new URLSearchParams({
+    txn: "pay",
+    recipients,
+    amount: (totalCents / 100).toFixed(2),
+    note: String(invoiceNumber),
+  });
+  return `https://venmo.com/?${params.toString()}`;
+}
 
 async function insertInvoice(tx: Tx, input: InvoiceWrite) {
   const number = await allocateInvoiceNumber(tx);
@@ -108,6 +122,8 @@ async function insertInvoice(tx: Tx, input: InvoiceWrite) {
       source: input.source,
       stripeCheckoutSessionId: input.stripeCheckoutSessionId ?? null,
       checkoutUrl: input.checkoutUrl ?? null,
+      venmoHandle: input.venmoHandle ?? null,
+      zelleRecipient: input.zelleRecipient ?? null,
       paidAt: input.paidAt ?? null,
     },
   });
@@ -120,7 +136,7 @@ export async function saveAdminInvoice(input: InvoiceWrite) {
 export async function markVenmoInvoicePaid(id: string) {
   const invoice = await prisma.invoice.findUnique({ where: { id } });
   if (!invoice) throw new Error("That invoice is already gone.");
-  if (invoice.paymentMethod !== "VENMO") {
+  if (invoice.paymentMethod === "STRIPE") {
     throw new Error("Stripe invoices are marked paid when Stripe confirms the payment.");
   }
   if (invoice.status === "PAID") return invoice;

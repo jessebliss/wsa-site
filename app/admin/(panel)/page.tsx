@@ -21,11 +21,11 @@ export default async function AdminHome() {
           <p className="text-sm text-muted-foreground">Upcoming sessions</p>
           <p className="font-display text-4xl">{upcoming}</p>
         </Link>
-        <Link href="/admin/subscriptions" className="rounded-2xl bg-white p-4">
+        <Link href="/admin/billing" className="rounded-2xl bg-white p-4">
           <p className="text-sm text-muted-foreground">Active plans</p>
           <p className="font-display text-4xl">{active}</p>
         </Link>
-        <Link href="/admin/subscriptions" className="rounded-2xl bg-white p-4">
+        <Link href="/admin/billing" className="rounded-2xl bg-white p-4">
           <p className="text-sm text-muted-foreground">Past due</p>
           <p className="font-display text-4xl">{pastDue}</p>
         </Link>

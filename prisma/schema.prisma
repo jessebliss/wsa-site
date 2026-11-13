@@ -373,6 +373,7 @@ model CoachDay {
 enum InvoicePayMethod {
   STRIPE
   VENMO
+  ZELLE
 }
 
 enum InvoiceStatus {
@@ -409,6 +410,8 @@ model Invoice {
   source                  String
   stripeCheckoutSessionId String?          @unique
   checkoutUrl             String?
+  venmoHandle             String?
+  zelleRecipient          String?
   paidAt                  DateTime?
   createdAt               DateTime         @default(now())
   updatedAt               DateTime         @updatedAt

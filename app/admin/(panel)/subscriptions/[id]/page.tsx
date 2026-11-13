@@ -39,7 +39,7 @@ export default async function SubscriptionDetail({
 
   return (
     <div>
-      <Link href="/admin/subscriptions" className="text-sm font-semibold text-primary">All subscriptions</Link>
+      <Link href="/admin/billing" className="text-sm font-semibold text-primary">Billing</Link>
       <h1 className="mt-2 font-display text-4xl uppercase">{sub.playerName}</h1>
       <p className="text-sm">{sub.parentName} · {sub.email} · {sub.phone}</p>
       <p className="mt-2 text-sm font-semibold">

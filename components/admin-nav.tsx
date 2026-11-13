@@ -10,6 +10,9 @@ export function AdminNav({ links }: { links: [string, string][] }) {
 
   function current(href: string) {
     if (href === "/admin") return pathname === "/admin";
+    if (href === "/admin/billing") {
+      return pathname === href || pathname.startsWith(`${href}/`) || pathname.startsWith("/admin/subscriptions");
+    }
     return pathname === href || pathname.startsWith(`${href}/`);
   }
 
