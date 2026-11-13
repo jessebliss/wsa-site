@@ -369,3 +369,50 @@ model CoachDay {
   @@index([dayKey])
   @@map("coach_days")
 }
+
+enum InvoicePayMethod {
+  STRIPE
+  VENMO
+}
+
+enum InvoiceStatus {
+  OPEN
+  PAID
+}
+
+model InvoiceSequence {
+  id         String   @id @default("site")
+  nextNumber Int      @default(1000)
+  updatedAt  DateTime @updatedAt
+
+  @@map("invoice_sequences")
+}
+
+model Invoice {
+  id                      String           @id @default(cuid())
+  number                  Int              @unique
+  customerName            String
+  email                   String
+  phone                   String
+  playerName              String
+  activity                String
+  amountCents             Int
+  registrationFixedCents  Int              @default(0)
+  registrationBps         Int              @default(0)
+  taxFixedCents           Int              @default(0)
+  taxBps                  Int              @default(0)
+  registrationCents       Int              @default(0)
+  taxCents                Int              @default(0)
+  totalCents              Int
+  paymentMethod           InvoicePayMethod
+  status                  InvoiceStatus    @default(OPEN)
+  source                  String
+  stripeCheckoutSessionId String?          @unique
+  checkoutUrl             String?
+  paidAt                  DateTime?
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+
+  @@index([createdAt])
+  @@map("invoices")
+}

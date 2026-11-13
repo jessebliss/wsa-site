@@ -5,7 +5,15 @@ import { redirect } from "next/navigation";
 import { auth, signOut } from "@/lib/auth";
 import { refundRegistration } from "@/lib/billing";
 import { ensurePlanStripePrice } from "@/lib/billing";
-import { dollarsToCents, optionalDollarsToCents } from "@/lib/money";
+import { sendReceipt } from "@/lib/email";
+import {
+  invoiceCharge,
+  markVenmoInvoicePaid,
+  resolveInvoiceActivity,
+  saveAdminInvoice,
+  setNextInvoiceNumber,
+} from "@/lib/invoices";
+import { dollarsToCents, formatMoney, optionalDollarsToCents } from "@/lib/money";
 import { isEventColorId } from "@/lib/plan-options";
 import { percentToBps } from "@/lib/fees";
 import { prisma } from "@/lib/prisma";
@@ -28,7 +36,7 @@ import {
 import { hourStartsForDay } from "@/lib/availability";
 import { hashPassword } from "@/lib/password";
 import { etDayKey, shiftMonth } from "@/lib/time";
-import { normalizeEmail } from "@/lib/utils";
+import { appUrl, normalizeEmail } from "@/lib/utils";
 import { Prisma, type BillingInterval } from "@prisma/client";
 
 async function requireAdmin() {
@@ -570,6 +578,145 @@ export async function refundOneTime(formData: FormData) {
     fail(back, error);
   }
   redirect(back);
+}
+
+function readInvoiceCustomer(formData: FormData) {
+  const parentName = String(formData.get("parentName") ?? "").trim();
+  const email = normalizeEmail(String(formData.get("email") ?? ""));
+  const phone = String(formData.get("phone") ?? "").trim();
+  const playerName = String(formData.get("playerName") ?? "").trim();
+  if (parentName.length < 2) throw new Error("Enter the parent name.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email.");
+  if (phone.replace(/\D/g, "").length < 7) throw new Error("Enter a phone number.");
+  if (playerName.length < 2) throw new Error("Enter the player name.");
+  return { parentName, email, phone, playerName };
+}
+
+export async function createInvoice(formData: FormData) {
+  await requireAdmin();
+  let next = "/admin/invoices?sent=1";
+  try {
+    const activity = await resolveInvoiceActivity(String(formData.get("activity") ?? ""));
+    const amountCents = dollarsToCents(String(formData.get("amount") ?? ""));
+    const fees = {
+      registrationFixedCents: optionalDollarsToCents(String(formData.get("registrationFixed") ?? "")),
+      registrationBps: percentToBps(String(formData.get("registrationPercent") ?? "")),
+      taxFixedCents: optionalDollarsToCents(String(formData.get("taxFixed") ?? "")),
+      taxBps: percentToBps(String(formData.get("taxPercent") ?? "")),
+    };
+    const customer = readInvoiceCustomer(formData);
+    const method = String(formData.get("paymentMethod") ?? "stripe");
+    const charge = invoiceCharge(amountCents, fees);
+    if (charge.totalCents <= 0) throw new Error("The invoice total has to be more than zero.");
+    const shared = {
+      customerName: customer.parentName,
+      email: customer.email,
+      phone: customer.phone,
+      playerName: customer.playerName,
+      activity,
+      amountCents,
+      fees,
+      registrationCents: charge.registrationCents,
+      taxCents: charge.taxCents,
+      totalCents: charge.totalCents,
+      source: "admin",
+    };
+
+    if (method === "venmo") {
+      await saveAdminInvoice({
+        ...shared,
+        paymentMethod: "VENMO",
+        status: "OPEN",
+      });
+      next = "/admin/invoices?sent=venmo";
+    } else if (method === "stripe") {
+      if (!stripeConfigured()) {
+        throw new Error("Stripe is not configured. Add STRIPE_SECRET_KEY before sending an invoice. Nothing was charged.");
+      }
+      const stripe = getStripe();
+      const lines = [
+        { label: activity, cents: charge.sessionCents },
+        ...(charge.registrationCents > 0 ? [{ label: "Registration", cents: charge.registrationCents }] : []),
+        ...(charge.taxCents > 0 ? [{ label: "Tax", cents: charge.taxCents }] : []),
+      ];
+      const checkout = await stripe.checkout.sessions.create({
+        mode: "payment",
+        customer_email: customer.email,
+        success_url: `${appUrl()}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${appUrl()}/checkout/cancel`,
+        line_items: lines.map((line) => ({
+          quantity: 1,
+          price_data: {
+            currency: "usd",
+            unit_amount: line.cents,
+            product_data: { name: line.label },
+          },
+        })),
+        metadata: {
+          kind: "admin-invoice",
+          activity,
+          parentName: customer.parentName,
+          email: customer.email,
+          phone: customer.phone,
+          playerName: customer.playerName,
+        },
+      });
+      if (!checkout.url) throw new Error("Stripe did not return a checkout link.");
+      const invoice = await saveAdminInvoice({
+        ...shared,
+        paymentMethod: "STRIPE",
+        status: "OPEN",
+        stripeCheckoutSessionId: checkout.id,
+        checkoutUrl: checkout.url,
+      });
+      const canEmail = Boolean(process.env.RESEND_API_KEY && process.env.RECEIPT_FROM_EMAIL);
+      if (canEmail) {
+        await sendReceipt(
+          customer.email,
+          `Walker Sports Academy invoice ${invoice.number}`,
+          [
+            `Invoice ${invoice.number}`,
+            `For: ${activity}`,
+            `Player: ${customer.playerName}`,
+            `Amount: ${formatMoney(charge.totalCents)}`,
+            "",
+            `Pay here: ${checkout.url}`,
+          ].join("\n"),
+        );
+      }
+      next = canEmail ? "/admin/invoices?sent=1" : `/admin/invoices?sent=link&id=${invoice.id}`;
+    } else {
+      throw new Error("Choose Stripe or Venmo.");
+    }
+  } catch (error) {
+    fail("/admin/invoices", error);
+  }
+  revalidatePath("/admin/invoices");
+  redirect(next);
+}
+
+export async function saveInvoiceSequence(formData: FormData) {
+  await requireAdmin();
+  try {
+    const raw = String(formData.get("nextNumber") ?? "").trim();
+    if (!/^\d+$/.test(raw)) throw new Error("Enter a whole number for the next invoice.");
+    await setNextInvoiceNumber(Number(raw));
+  } catch (error) {
+    fail("/admin/invoices", error);
+  }
+  revalidatePath("/admin/invoices");
+  redirect("/admin/invoices?saved=next");
+}
+
+export async function markInvoicePaid(formData: FormData) {
+  await requireAdmin();
+  try {
+    await markVenmoInvoicePaid(String(formData.get("id") ?? ""));
+  } catch (error) {
+    fail("/admin/invoices", error);
+  }
+  revalidatePath("/admin/invoices");
+  redirect("/admin/invoices?saved=paid");
 }
 
 export async function subscriptionAction(formData: FormData) {

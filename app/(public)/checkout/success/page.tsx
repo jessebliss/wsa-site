@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { markSessionPaid, upsertFromStripeSubscription } from "@/lib/billing";
+import { ensurePaidCheckoutInvoice } from "@/lib/invoices";
 import { stripeConfigured, getStripe } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ export default async function SuccessPage({
       const session = await stripe.checkout.sessions.retrieve(sessionId);
       if (session.mode === "payment" && session.payment_status === "paid") {
         await markSessionPaid(session);
+        await ensurePaidCheckoutInvoice(session);
         detail = "Payment received. A receipt is on the way if email is configured, and the spot is confirmed.";
       } else if (session.mode === "subscription" && session.status === "complete") {
         const subId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
@@ -25,6 +27,7 @@ export default async function SuccessPage({
           const sub = await stripe.subscriptions.retrieve(subId);
           await upsertFromStripeSubscription(sub, { ...sub.metadata, ...session.metadata });
         }
+        await ensurePaidCheckoutInvoice(session);
         detail = "Membership started. The receipt includes a Stripe link to update the card or cancel. Group bookings use the same email.";
       }
     } catch {

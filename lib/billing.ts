@@ -2,6 +2,7 @@ import type Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { billingPortalUrl, getStripe } from "@/lib/stripe";
 import { sendReceipt } from "@/lib/email";
+import { ensurePaidCheckoutInvoice } from "@/lib/invoices";
 import { appUrl, ACADEMY_EMAIL, ACADEMY_PHONE } from "@/lib/utils";
 import { formatMoney } from "@/lib/money";
 import { formatEtLong } from "@/lib/time";
@@ -179,6 +180,11 @@ export async function handleStripeEvent(event: Stripe.Event) {
         const sub = await getStripe().subscriptions.retrieve(subId);
         await upsertFromStripeSubscription(sub, { ...sub.metadata, ...session.metadata });
       }
+    }
+    try {
+      await ensurePaidCheckoutInvoice(session);
+    } catch (error) {
+      console.error("Could not record the invoice", error);
     }
   }
 
