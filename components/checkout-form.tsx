@@ -11,6 +11,11 @@ export type CheckoutLine = { label: string; cents: number };
 
 const GRADES = ["K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "College"];
 
+function readText(data: FormData, name: string) {
+  const value = data.get(name);
+  return typeof value === "string" ? value : null;
+}
+
 export function CheckoutForm({
   sessionId,
   priceCents,
@@ -78,22 +83,53 @@ export function CheckoutForm({
     setError("");
     const form = event.currentTarget;
     const data = new FormData(form);
+    const parentName = readText(data, intake === "intro" ? "name" : "parentName");
+    const email = readText(data, "email");
+    const phone = readText(data, "phone");
+    const playerName = readText(data, intake === "intro" ? "name" : "playerName");
+    const school = readText(data, "school");
+    const grade = readText(data, "grade");
+    const social = readText(data, "social");
+    const coachFromForm = readText(data, "coachName");
+    // Scheduled sessions have no coach input, and coachName is optional there.
+    // Intro requires the hidden coach field, so a missing value stays null and is blocked below.
+    const submittedCoach = flagRole ? flagCoach : intake === "intro" ? coachFromForm : (coachFromForm ?? "");
+    const missing = !parentName
+      ? "Enter the parent name."
+      : !email
+        ? "Enter a valid email."
+        : !phone
+          ? "Enter a phone number."
+          : !playerName
+            ? "Enter the player name."
+            : intake === "intro" && !school
+              ? "Enter a school."
+              : intake === "intro" && !grade
+                ? "Enter a grade."
+                : intake === "intro" && !social
+                  ? "Enter a social account."
+                  : intake === "intro" && !submittedCoach
+                    ? "Choose a coach."
+                    : "";
+    if (missing) {
+      setPending(false);
+      setError(missing);
+      return;
+    }
     const response = await fetch("/api/checkout/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         intent: "book",
         sessionId,
-        parentName: intake === "intro" ? data.get("name") : data.get("parentName"),
-        email: data.get("email"),
-        phone: data.get("phone"),
-        playerName: intake === "intro" ? data.get("name") : data.get("playerName"),
-        school: data.get("school"),
-        grade: data.get("grade"),
-        social: data.get("social"),
-        coachName: flagRole ? flagCoach : data.get("coachName"),
+        parentName,
+        email,
+        phone,
+        playerName,
+        ...(intake === "intro" ? { school, grade, social } : {}),
+        coachName: submittedCoach,
         flagRole: flagRole || undefined,
-        promoCode: data.get("promoCode"),
+        promoCode: readText(data, "promoCode") ?? "",
         acceptWaiver: accepted,
       }),
     });
