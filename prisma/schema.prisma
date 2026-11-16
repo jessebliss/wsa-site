@@ -144,6 +144,8 @@ model TrainingSession {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   registrations   Registration[]
+  invoices        Invoice[]          @relation("InvoiceBooking")
+  proposedOn      Invoice[]          @relation("InvoiceProposal")
 
   @@unique([seriesId, occurrenceDay])
   @@index([startsAt])
@@ -381,6 +383,13 @@ enum InvoiceStatus {
   PAID
 }
 
+enum InvoiceReview {
+  PENDING
+  ACCEPTED
+  DECLINED
+  PROPOSED
+}
+
 model InvoiceSequence {
   id         String   @id @default("site")
   nextNumber Int      @default(1000)
@@ -412,10 +421,22 @@ model Invoice {
   checkoutUrl             String?
   venmoHandle             String?
   zelleRecipient          String?
+  program                 String?
+  coachName               String?
+  bookedDay               String?
+  sessionId               String?
+  session                 TrainingSession? @relation("InvoiceBooking", fields: [sessionId], references: [id], onDelete: SetNull)
+  registrationId          String?          @unique
+  reviewStatus            InvoiceReview?
+  proposedSessionId       String?
+  proposedSession         TrainingSession? @relation("InvoiceProposal", fields: [proposedSessionId], references: [id], onDelete: SetNull)
+  proposedDay             String?
+  proposedTime            String?
   paidAt                  DateTime?
   createdAt               DateTime         @default(now())
   updatedAt               DateTime         @updatedAt
 
   @@index([createdAt])
+  @@index([sessionId])
   @@map("invoices")
 }

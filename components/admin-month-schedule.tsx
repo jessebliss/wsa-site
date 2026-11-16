@@ -1,23 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarLegend, legendItems } from "@/components/calendar-legend";
 import { DayEventsPanel } from "@/components/day-events";
 import { MonthCalendar, type CalendarBlock } from "@/components/month-calendar";
+import type { ReviewSlot } from "@/components/transaction-review";
 
 export function AdminMonthSchedule({
   events,
+  slots,
   todayKey,
   minMonth,
   maxMonth,
+  initialDay = "",
+  focusEventId = "",
 }: {
   events: CalendarBlock[];
+  slots: ReviewSlot[];
   todayKey: string;
   minMonth: string;
   maxMonth: string;
+  initialDay?: string;
+  focusEventId?: string;
 }) {
-  const [month, setMonth] = useState(todayKey.slice(0, 7));
-  const [day, setDay] = useState("");
+  const opened = initialDay || todayKey;
+  const [month, setMonth] = useState(opened.slice(0, 7));
+  const [day, setDay] = useState(initialDay);
+  useEffect(() => {
+    if (!focusEventId) return;
+    document.getElementById(`event-${focusEventId}`)?.scrollIntoView({ block: "center" });
+  }, [focusEventId, day]);
   const inMonth = events.filter((event) => event.dayKey.startsWith(month));
 
   return (
@@ -44,7 +56,7 @@ export function AdminMonthSchedule({
           }}
         />
         {inMonth.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No events this month.</p> : null}
-        <DayEventsPanel dayKey={day} events={events} />
+        <DayEventsPanel dayKey={day} events={events} slots={slots} focusEventId={focusEventId} />
       </div>
     </div>
   );

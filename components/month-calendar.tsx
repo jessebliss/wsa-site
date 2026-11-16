@@ -23,6 +23,14 @@ export type CalendarBlock = {
   href?: string;
   /** Extra booking line, such as price and spots. Omit when the row already says enough. */
   note?: string;
+  reviews?: {
+    id: string;
+    number: number;
+    parentName: string;
+    playerName: string;
+    reviewStatus: "PENDING" | "ACCEPTED" | "DECLINED" | "PROPOSED" | null;
+    proposal: string | null;
+  }[];
 };
 
 function blockStyle(color: string, canceled: boolean): CSSProperties {

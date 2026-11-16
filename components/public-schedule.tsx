@@ -433,10 +433,13 @@ export function PublicSchedule({
         const spotsLabel = `${spots} spot${spots === 1 ? "" : "s"} left`;
         return {
           ...block,
-          href:
-            path === "flag" && flagRole
-              ? `/book/${session.id}?${new URLSearchParams({ role: flagRole, coach }).toString()}`
-              : block.href,
+          href: (() => {
+            const query = new URLSearchParams();
+            if (coach) query.set("coach", coach);
+            if (path === "flag" && flagRole) query.set("role", flagRole);
+            const search = query.toString();
+            return search ? `/book/${session.id}?${search}` : block.href;
+          })(),
           note: price != null ? `${formatMoney(price)} · ${spotsLabel}` : spotsLabel,
         };
       });

@@ -9,6 +9,7 @@ import { loadCoachRoster } from "@/lib/roster";
 import { sessionCoachNames } from "@/lib/schedule-filter";
 import { extendSeriesHorizon } from "@/lib/series";
 import { prisma } from "@/lib/prisma";
+import { transactionProposal } from "@/components/transaction-rows";
 import { PARK } from "@/lib/utils";
 import { addMonthsToDay, etDayKey, etToUtc, formatEtTime, shiftMonth } from "@/lib/time";
 
@@ -18,15 +19,16 @@ export const metadata = { title: "Schedule" };
 export default async function ScheduleAdmin({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; day?: string; event?: string; saved?: string }>;
 }) {
   const params = await searchParams;
+  const openedDay = /^\d{4}-\d{2}-\d{2}$/.test(params.day ?? "") ? params.day ?? "" : "";
   const today = etDayKey(new Date());
   await extendSeriesHorizon(today);
   await ensureTrainingTypes();
   const minMonth = shiftMonth(today.slice(0, 7), -12);
   const maxMonth = shiftMonth(today.slice(0, 7), 8);
-  const [sessions, roster, plans, types] = await Promise.all([
+  const [sessions, roster, plans, types, reviews] = await Promise.all([
     prisma.trainingSession.findMany({
       where: {
         startsAt: {
@@ -39,7 +41,18 @@ export default async function ScheduleAdmin({
     loadCoachRoster(),
     prisma.plan.findMany({ select: { program: true, color: true, active: true, sortOrder: true } }),
     loadTrainingTypes(),
+    prisma.invoice.findMany({
+      where: { sessionId: { not: null } },
+      orderBy: { number: "desc" },
+    }),
   ]);
+  const reviewsBySession = new Map<string, typeof reviews>();
+  for (const invoice of reviews) {
+    if (!invoice.sessionId) continue;
+    const list = reviewsBySession.get(invoice.sessionId) ?? [];
+    list.push(invoice);
+    reviewsBySession.set(invoice.sessionId, list);
+  }
 
   return (
     <div>
@@ -48,10 +61,19 @@ export default async function ScheduleAdmin({
         Times are Eastern. A group session starts on every coach until you remove someone. Cancel leaves the event on the calendar. Delete removes it.
       </p>
       <AdminError message={params.error} />
+      {params.saved === "review" ? <p className="mt-3 text-sm font-semibold text-primary">Saved on that transaction.</p> : null}
       <AdminMonthSchedule
         todayKey={today}
         minMonth={minMonth}
         maxMonth={maxMonth}
+        initialDay={openedDay}
+        focusEventId={params.event ?? ""}
+        slots={sessions
+          .filter((session) => session.status === "SCHEDULED")
+          .map((session) => ({
+            id: session.id,
+            label: `${etDayKey(session.startsAt)} · ${formatEtTime(session.startsAt)} · ${session.title}`,
+          }))}
         events={sessions.map((session) => {
           const color = colorForProgram(session.program, plans);
           return {
@@ -68,6 +90,14 @@ export default async function ScheduleAdmin({
             colorId: color.id,
             canceled: session.status === "CANCELED",
             href: `/admin/schedule/${session.id}`,
+            reviews: (reviewsBySession.get(session.id) ?? []).map((invoice) => ({
+              id: invoice.id,
+              number: invoice.number,
+              parentName: invoice.customerName,
+              playerName: invoice.playerName,
+              reviewStatus: invoice.reviewStatus,
+              proposal: transactionProposal(invoice),
+            })),
           };
         })}
       />

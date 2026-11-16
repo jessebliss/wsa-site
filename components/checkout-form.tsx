@@ -93,7 +93,7 @@ export function CheckoutForm({
     const coachFromForm = readText(data, "coachName");
     // Scheduled sessions have no coach input, and coachName is optional there.
     // Intro requires the hidden coach field, so a missing value stays null and is blocked below.
-    const submittedCoach = flagRole ? flagCoach : intake === "intro" ? coachFromForm : (coachFromForm ?? "");
+    const submittedCoach = flagRole ? flagCoach : intake === "intro" ? coachFromForm : (coachFromForm ?? coachName);
     const missing = !parentName
       ? "Enter the parent name."
       : !email
@@ -194,6 +194,7 @@ export function CheckoutForm({
         </>
       ) : (
         <>
+          {coachName ? <input type="hidden" name="coachName" value={coachName} /> : null}
           <div>
             <Label htmlFor="parentName">Parent name</Label>
             <Input className="mt-1" id="parentName" name="parentName" required autoComplete="name" />

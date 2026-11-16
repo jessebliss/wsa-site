@@ -252,8 +252,8 @@ export async function POST(request: Request) {
       coach: input.coachName,
     });
     if (priced.charge.totalCents === 0) {
-      const held = await holdOneTime(session.id, person, priced.promo, priced.charge);
-      await prisma.registration.update({
+    const held = await holdOneTime(session.id, person, priced.promo, priced.charge, input.coachName);
+    await prisma.registration.update({
         where: { id: held.registration.id },
         data: { paymentStatus: "PAID", holdExpiresAt: null },
       });
@@ -270,7 +270,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const held = await holdOneTime(session.id, person, priced.promo, priced.charge);
+    const held = await holdOneTime(session.id, person, priced.promo, priced.charge, input.coachName);
     try {
       // The promo is already taken off the session line. Stripe must not apply it again,
       // or it would also discount registration and tax.

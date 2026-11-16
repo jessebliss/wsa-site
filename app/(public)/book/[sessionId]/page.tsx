@@ -35,6 +35,7 @@ export default async function SessionCheckoutPage({
   const girlsFlag = isGirlsFlagProgram(session.program);
   const flagRole = parseFlagRole(query.role);
   const flagCoach = query.coach?.trim() ?? "";
+  const clickedCoach = flagCoach;
   const flagPrice = girlsFlag && flagRole && flagCoach ? await girlsFlagChargeCents(session, flagRole, flagCoach) : null;
   const listPrice = girlsFlag ? flagPrice ?? 0 : await listedSessionPrice(session);
   const flagNeedsChoice = girlsFlag && flagPrice == null;
@@ -87,6 +88,7 @@ export default async function SessionCheckoutPage({
             allowPromo
             flagRole={flagRole ?? ""}
             flagCoach={flagCoach}
+            coachName={clickedCoach}
           />
         </div>
       )}

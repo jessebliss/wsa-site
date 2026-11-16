@@ -9,7 +9,7 @@ import { sendReceipt } from "@/lib/email";
 import {
   invoiceCharge,
   markVenmoInvoicePaid,
-  resolveInvoiceActivity,
+  resolveInvoiceSelection,
   saveAdminInvoice,
   setNextInvoiceNumber,
 } from "@/lib/invoices";
@@ -34,7 +34,7 @@ import {
 } from "@/lib/subscription-admin";
 import { hourStartsForDay } from "@/lib/availability";
 import { hashPassword } from "@/lib/password";
-import { etDayKey, shiftMonth } from "@/lib/time";
+import { etDayKey, formatEtTime, shiftMonth } from "@/lib/time";
 import { appUrl, normalizeEmail } from "@/lib/utils";
 import { Prisma, type BillingInterval } from "@prisma/client";
 
@@ -576,7 +576,19 @@ export async function createInvoice(formData: FormData) {
   await requireAdmin();
   let next = "/admin/billing?sent=1";
   try {
-    const activity = await resolveInvoiceActivity(String(formData.get("activity") ?? ""));
+    const selection = await resolveInvoiceSelection(String(formData.get("activity") ?? ""));
+    const activity = selection.activity;
+    const dayRaw = String(formData.get("bookedDay") ?? "").trim();
+    const coachRaw = String(formData.get("coachName") ?? "").trim();
+    const bookedDay = /^\d{4}-\d{2}-\d{2}$/.test(dayRaw) ? dayRaw : selection.bookedDay;
+    const coachName = coachRaw && !isPlaceholderCoach(coachRaw) ? coachRaw : selection.coachName;
+    const schedule = {
+      program: selection.program,
+      bookedDay,
+      coachName,
+      sessionId: selection.sessionId,
+      reviewStatus: selection.sessionId ? ("PENDING" as const) : null,
+    };
     const amountCents = dollarsToCents(String(formData.get("amount") ?? ""));
     const fees = {
       registrationFixedCents: optionalDollarsToCents(String(formData.get("registrationFixed") ?? "")),
@@ -594,6 +606,7 @@ export async function createInvoice(formData: FormData) {
       phone: customer.phone,
       playerName: customer.playerName,
       activity,
+      ...schedule,
       amountCents,
       fees,
       registrationCents: charge.registrationCents,
@@ -683,8 +696,51 @@ export async function createInvoice(formData: FormData) {
   } catch (error) {
     fail("/admin/billing", error);
   }
+  revalidatePath("/admin");
   revalidatePath("/admin/billing");
   redirect(next);
+}
+
+export async function reviewInvoice(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const invoice = await prisma.invoice.findUnique({ where: { id } });
+  const back = invoice?.bookedDay && invoice.sessionId
+    ? `/admin/schedule?day=${encodeURIComponent(invoice.bookedDay)}&event=${encodeURIComponent(invoice.sessionId)}`
+    : "/admin/schedule";
+  try {
+    if (!invoice) throw new Error("That transaction is already gone.");
+    const decision = String(formData.get("decision") ?? "");
+    if (decision === "accept") {
+      await prisma.invoice.update({ where: { id }, data: { reviewStatus: "ACCEPTED" } });
+    } else if (decision === "decline") {
+      await prisma.invoice.update({ where: { id }, data: { reviewStatus: "DECLINED" } });
+    } else if (decision === "propose") {
+      const slotId = String(formData.get("slotId") ?? "");
+      const slot = await prisma.trainingSession.findUnique({ where: { id: slotId } });
+      if (!slot || slot.status !== "SCHEDULED") throw new Error("Choose another time on the calendar.");
+      if (slot.id === invoice.sessionId) throw new Error("Pick a different time.");
+      await prisma.invoice.update({
+        where: { id },
+        data: {
+          reviewStatus: "PROPOSED",
+          proposedSessionId: slot.id,
+          proposedDay: slot.occurrenceDay ?? etDayKey(slot.startsAt),
+          proposedTime: formatEtTime(slot.startsAt),
+        },
+      });
+    } else {
+      throw new Error("Choose accept, decline, or a new time.");
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Something went wrong.";
+    const join = back.includes("?") ? "&" : "?";
+    redirect(`${back}${join}error=${encodeURIComponent(message)}`);
+  }
+  revalidatePath("/admin");
+  revalidatePath("/admin/billing");
+  revalidatePath("/admin/schedule");
+  redirect(`${back}${back.includes("?") ? "&" : "?"}saved=review`);
 }
 
 export async function saveInvoiceSequence(formData: FormData) {
@@ -707,6 +763,7 @@ export async function markInvoicePaid(formData: FormData) {
   } catch (error) {
     fail("/admin/billing", error);
   }
+  revalidatePath("/admin");
   revalidatePath("/admin/billing");
   redirect("/admin/billing?saved=paid");
 }

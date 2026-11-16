@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { toTransactionRow, TransactionRows } from "@/components/transaction-rows";
+import { recentInvoices } from "@/lib/invoices";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -6,11 +8,12 @@ export const metadata = { title: "Admin" };
 
 export default async function AdminHome() {
   const now = new Date();
-  const [upcoming, active, pastDue, messages] = await Promise.all([
+  const [upcoming, active, pastDue, messages, transactions] = await Promise.all([
     prisma.trainingSession.count({ where: { status: "SCHEDULED", startsAt: { gte: now } } }),
     prisma.subscription.count({ where: { status: "ACTIVE", paymentMethod: "STRIPE" } }),
     prisma.subscription.count({ where: { status: "PAST_DUE", paymentMethod: "STRIPE" } }),
     prisma.contactMessage.findMany({ orderBy: { createdAt: "desc" }, take: 5 }),
+    recentInvoices(),
   ]);
 
   return (
@@ -30,6 +33,8 @@ export default async function AdminHome() {
           <p className="font-display text-4xl">{pastDue}</p>
         </Link>
       </div>
+      <h2 className="mt-8 font-display text-2xl uppercase">Recent transactions</h2>
+      <TransactionRows invoices={transactions.map(toTransactionRow)} />
       <h2 className="mt-8 font-display text-2xl uppercase">Recent messages</h2>
       {messages.length === 0 ? (
         <p className="mt-2 text-sm text-muted-foreground">No contact messages yet.</p>

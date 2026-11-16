@@ -109,5 +109,5 @@ export async function bookPrivateQuarterbackHour(formData: FormData) {
   }
   if (!id) redirect("/");
   revalidatePath("/");
-  redirect(`/book/${id}`);
+  redirect(`/book/${id}?coach=${encodeURIComponent(coach)}`);
 }

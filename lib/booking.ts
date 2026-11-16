@@ -1,7 +1,7 @@
 import { hoursCoveredBySession } from "@/lib/availability";
 import { isIntro } from "@/lib/intro";
 import { prisma } from "@/lib/prisma";
-import { isPlaceholderOnly } from "@/lib/schedule-filter";
+import { isPlaceholderCoach, isPlaceholderOnly, parentCoachNames } from "@/lib/schedule-filter";
 import { etDayKey } from "@/lib/time";
 import { normalizeEmail } from "@/lib/utils";
 import type { PromoCode, TrainingSession } from "@prisma/client";
@@ -276,6 +276,7 @@ export async function holdOneTime(
   person: PersonInput,
   promo: PromoCode | null,
   charge: { totalCents: number; registrationCents: number; taxCents: number },
+  coachName?: string | null,
 ) {
   const email = normalizeEmail(person.email);
   const now = new Date();
@@ -297,6 +298,10 @@ export async function holdOneTime(
         waiverId: waiver.id,
       },
     });
+    const picked = (coachName ?? "").trim();
+    const coach = picked && !isPlaceholderCoach(picked)
+      ? parentCoachNames(session).find((name) => name.toLowerCase() === picked.toLowerCase()) ?? null
+      : null;
     const registration = await tx.registration.create({
       data: {
         sessionId: session.id,
@@ -304,6 +309,7 @@ export async function holdOneTime(
         parentName: person.parentName,
         phone: person.phone,
         playerName: person.playerName,
+        coachName: coach,
         kind: "ONE_TIME",
         paymentStatus: "PENDING",
         amountCents: charge.totalCents,

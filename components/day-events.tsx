@@ -1,8 +1,19 @@
 import Link from "next/link";
 import type { CalendarBlock } from "@/components/month-calendar";
+import { TransactionReview, type ReviewSlot } from "@/components/transaction-review";
 import { etToUtc, formatEt } from "@/lib/time";
 
-export function DayEventsPanel({ dayKey, events }: { dayKey: string; events: CalendarBlock[] }) {
+export function DayEventsPanel({
+  dayKey,
+  events,
+  slots = [],
+  focusEventId = "",
+}: {
+  dayKey: string;
+  events: CalendarBlock[];
+  slots?: ReviewSlot[];
+  focusEventId?: string;
+}) {
   if (!dayKey) return null;
   const rows = events
     .filter((event) => event.dayKey === dayKey)
@@ -40,12 +51,15 @@ export function DayEventsPanel({ dayKey, events }: { dayKey: string; events: Cal
               </div>
             );
             const book = event.href?.startsWith("/book/");
+            const focused = focusEventId === event.id;
+            const otherSlots = slots.filter((slot) => slot.id !== event.id);
             return (
               <li
                 key={event.id}
+                id={`event-${event.id}`}
                 data-day-event={event.id}
                 data-canceled={event.canceled ? "yes" : "no"}
-                className="overflow-hidden rounded-2xl border border-black/15 bg-background"
+                className={`overflow-hidden rounded-2xl border border-black/15 bg-background ${focused ? "ring-2 ring-ink" : ""}`}
                 style={{ borderLeftColor: event.color, borderLeftWidth: 4, opacity: event.canceled ? 0.55 : 1 }}
               >
                 {event.href ? (
@@ -56,6 +70,18 @@ export function DayEventsPanel({ dayKey, events }: { dayKey: string; events: Cal
                 ) : (
                   <div className="px-5 py-5">{body}</div>
                 )}
+                {event.reviews?.map((review) => (
+                  <TransactionReview
+                    key={review.id}
+                    invoiceId={review.id}
+                    number={review.number}
+                    parentName={review.parentName}
+                    playerName={review.playerName}
+                    reviewStatus={review.reviewStatus}
+                    proposal={review.proposal}
+                    slots={otherSlots}
+                  />
+                ))}
               </li>
             );
           })}

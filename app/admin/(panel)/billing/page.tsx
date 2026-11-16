@@ -1,18 +1,22 @@
 import Link from "next/link";
 import { markInvoicePaid, saveInvoiceSequence } from "@/app/admin/(panel)/actions";
 import { AdminError } from "@/components/admin-error";
+import { DisclosurePanel } from "@/components/disclosure-panel";
 import { InvoiceForm, type InvoiceActivity } from "@/components/invoice-form";
+import { toTransactionRow, TransactionRows } from "@/components/transaction-rows";
 import { VenmoPayQr } from "@/components/venmo-pay-qr";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { bpsToPercentInput } from "@/lib/fees";
 import { loadCheckoutFees } from "@/lib/fees-data";
-import { readNextInvoiceNumber } from "@/lib/invoices";
+import { readNextInvoiceNumber, recentInvoices } from "@/lib/invoices";
+import { loadCoachRoster } from "@/lib/roster";
+import { parentCoachNames } from "@/lib/schedule-filter";
 import { centsToDollarInput, formatMoney } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { subscriptionPlanName } from "@/lib/subscription-admin";
-import { formatEt } from "@/lib/time";
+import { etDayKey, formatEt } from "@/lib/time";
 import { Prisma, type SubscriptionStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -65,8 +69,9 @@ export default async function BillingPage({
     ];
   }
 
-  const [invoices, nextNumber, fees, types, sessions, linked, subs] = await Promise.all([
+  const [invoices, recent, nextNumber, fees, types, sessions, linked, subs, roster] = await Promise.all([
     prisma.invoice.findMany({ orderBy: { number: "desc" } }),
+    recentInvoices(),
     readNextInvoiceNumber(),
     loadCheckoutFees(),
     prisma.trainingType.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
@@ -82,17 +87,40 @@ export default async function BillingPage({
       take: 200,
       include: { plan: true },
     }),
+    loadCoachRoster(),
   ]);
 
   const activities: InvoiceActivity[] = [
-    ...types.map((type) => ({ value: `type:${type.id}`, label: type.name, group: "Trainings", amountCents: null })),
-    ...plansForFilter.map((item) => ({ value: `plan:${item.id}`, label: item.name, group: "Plans", amountCents: item.priceCents })),
-    ...sessions.map((session) => ({
-      value: `session:${session.id}`,
-      label: `${session.title} · ${formatEt(session.startsAt, { month: "short", day: "numeric" })}`,
-      group: "Sessions",
-      amountCents: session.priceCents,
+    ...types.map((type) => ({
+      value: `type:${type.id}`,
+      label: type.name,
+      group: "Trainings",
+      amountCents: null,
+      program: type.name,
+      bookedDay: null,
+      coachName: null,
     })),
+    ...plansForFilter.map((item) => ({
+      value: `plan:${item.id}`,
+      label: item.name,
+      group: "Plans",
+      amountCents: item.priceCents,
+      program: item.program,
+      bookedDay: null,
+      coachName: null,
+    })),
+    ...sessions.map((session) => {
+      const coaches = parentCoachNames(session);
+      return {
+        value: `session:${session.id}`,
+        label: `${session.title} · ${formatEt(session.startsAt, { month: "short", day: "numeric" })}`,
+        group: "Sessions",
+        amountCents: session.priceCents,
+        program: session.program,
+        bookedDay: session.occurrenceDay ?? etDayKey(session.startsAt),
+        coachName: coaches.length === 1 ? coaches[0] : null,
+      };
+    }),
   ];
   const filtering = Boolean(q || status || plan);
 
@@ -125,15 +153,19 @@ export default async function BillingPage({
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
         Stripe sends a one-time checkout. Venmo and Zelle are saved unpaid until you mark them paid.
       </p>
-      <InvoiceForm
-        activities={activities}
-        fees={{
-          registrationFixed: centsToDollarInput(fees.registrationFixedCents),
-          registrationPercent: bpsToPercentInput(fees.registrationBps),
-          taxFixed: centsToDollarInput(fees.taxFixedCents),
-          taxPercent: bpsToPercentInput(fees.taxBps),
-        }}
-      />
+      <TransactionRows invoices={recent.map(toTransactionRow)} />
+      <DisclosurePanel label="Create an invoice" hideLabel="Hide invoice form" className="mt-6">
+        <InvoiceForm
+          activities={activities}
+          coaches={roster}
+          fees={{
+            registrationFixed: centsToDollarInput(fees.registrationFixedCents),
+            registrationPercent: bpsToPercentInput(fees.registrationBps),
+            taxFixed: centsToDollarInput(fees.taxFixedCents),
+            taxPercent: bpsToPercentInput(fees.taxBps),
+          }}
+        />
+      </DisclosurePanel>
       <form action={saveInvoiceSequence} className="mt-6 flex flex-wrap items-end gap-3 rounded-2xl bg-white p-4">
         <div>
           <Label htmlFor="nextNumber">Next invoice number</Label>

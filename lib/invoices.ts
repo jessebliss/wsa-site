@@ -1,8 +1,10 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, type InvoiceReview } from "@prisma/client";
 import type Stripe from "stripe";
 import { chargeLines, type FeeSettings } from "@/lib/fees";
 import { INTRO_LABEL } from "@/lib/intro";
 import { prisma } from "@/lib/prisma";
+import { isPlaceholderCoach, parentCoachNames } from "@/lib/schedule-filter";
+import { etDayKey } from "@/lib/time";
 
 type Tx = Prisma.TransactionClient;
 
@@ -42,22 +44,43 @@ async function allocateInvoiceNumber(tx: Tx) {
   return next - 1;
 }
 
-export async function resolveInvoiceActivity(value: string) {
-  if (value === "misc") return "Miscellaneous";
+export type InvoiceSelection = {
+  activity: string;
+  program: string | null;
+  bookedDay: string | null;
+  coachName: string | null;
+  sessionId: string | null;
+};
+
+function soleCoach(session: { kind: string; coach: string | null; coaches?: string[] | null }) {
+  const names = parentCoachNames(session);
+  return names.length === 1 ? names[0] : null;
+}
+
+export async function resolveInvoiceSelection(value: string): Promise<InvoiceSelection> {
+  if (value === "misc") {
+    return { activity: "Miscellaneous", program: null, bookedDay: null, coachName: null, sessionId: null };
+  }
   if (value.startsWith("type:")) {
     const type = await prisma.trainingType.findUnique({ where: { id: value.slice(5) } });
     if (!type) throw new Error("Choose an activity.");
-    return type.name;
+    return { activity: type.name, program: type.name, bookedDay: null, coachName: null, sessionId: null };
   }
   if (value.startsWith("plan:")) {
     const plan = await prisma.plan.findUnique({ where: { id: value.slice(5) } });
     if (!plan) throw new Error("Choose an activity.");
-    return plan.name;
+    return { activity: plan.name, program: plan.program || plan.name, bookedDay: null, coachName: null, sessionId: null };
   }
   if (value.startsWith("session:")) {
     const session = await prisma.trainingSession.findUnique({ where: { id: value.slice(8) } });
     if (!session) throw new Error("Choose an activity.");
-    return session.title;
+    return {
+      activity: session.title,
+      program: session.program,
+      bookedDay: session.occurrenceDay ?? etDayKey(session.startsAt),
+      coachName: soleCoach(session),
+      sessionId: session.id,
+    };
   }
   throw new Error("Choose an activity.");
 }
@@ -84,6 +107,12 @@ type InvoiceWrite = {
   checkoutUrl?: string | null;
   venmoHandle?: string | null;
   zelleRecipient?: string | null;
+  program?: string | null;
+  coachName?: string | null;
+  bookedDay?: string | null;
+  sessionId?: string | null;
+  registrationId?: string | null;
+  reviewStatus?: InvoiceReview | null;
   paidAt?: Date | null;
 };
 
@@ -124,6 +153,12 @@ async function insertInvoice(tx: Tx, input: InvoiceWrite) {
       checkoutUrl: input.checkoutUrl ?? null,
       venmoHandle: input.venmoHandle ?? null,
       zelleRecipient: input.zelleRecipient ?? null,
+      program: input.program ?? null,
+      coachName: input.coachName ?? null,
+      bookedDay: input.bookedDay ?? null,
+      sessionId: input.sessionId ?? null,
+      registrationId: input.registrationId ?? null,
+      reviewStatus: input.reviewStatus ?? null,
       paidAt: input.paidAt ?? null,
     },
   });
@@ -131,6 +166,10 @@ async function insertInvoice(tx: Tx, input: InvoiceWrite) {
 
 export async function saveAdminInvoice(input: InvoiceWrite) {
   return prisma.$transaction((tx) => insertInvoice(tx, input));
+}
+
+export async function recentInvoices(limit = 20) {
+  return prisma.invoice.findMany({ orderBy: { number: "desc" }, take: limit });
 }
 
 export async function markVenmoInvoicePaid(id: string) {
@@ -162,6 +201,8 @@ async function detailsFromCheckout(session: Stripe.Checkout.Session): Promise<In
       const activity =
         registration.session?.title ??
         (registration.product === "intro" ? INTRO_LABEL : registration.product || "Session");
+      const coach = registration.coachName?.trim() ?? "";
+      const booked = registration.session;
       return {
         customerName: registration.parentName,
         email: registration.email,
@@ -177,6 +218,12 @@ async function detailsFromCheckout(session: Stripe.Checkout.Session): Promise<In
         status: "PAID",
         source: "checkout",
         stripeCheckoutSessionId: session.id,
+        program: booked?.program ?? (registration.product === "intro" ? INTRO_LABEL : null),
+        coachName: coach && !isPlaceholderCoach(coach) ? coach : null,
+        bookedDay: booked ? (booked.occurrenceDay ?? etDayKey(booked.startsAt)) : null,
+        sessionId: booked?.id ?? null,
+        registrationId: registration.id,
+        reviewStatus: booked ? "PENDING" : null,
         paidAt: new Date(),
       };
     }
@@ -195,6 +242,7 @@ async function detailsFromCheckout(session: Stripe.Checkout.Session): Promise<In
     phone: meta.phone || "",
     playerName: meta.playerName || "",
     activity: plan?.name || "Membership",
+    program: plan?.program || plan?.name || "Membership",
     amountCents: total,
     fees: { registrationFixedCents: 0, registrationBps: 0, taxFixedCents: 0, taxBps: 0 },
     registrationCents: 0,

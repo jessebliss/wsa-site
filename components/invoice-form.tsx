@@ -12,15 +12,20 @@ export type InvoiceActivity = {
   label: string;
   group: string;
   amountCents: number | null;
+  program: string | null;
+  bookedDay: string | null;
+  coachName: string | null;
 };
 
 type PayMethod = "stripe" | "venmo" | "zelle";
 
 export function InvoiceForm({
   activities,
+  coaches,
   fees,
 }: {
   activities: InvoiceActivity[];
+  coaches: string[];
   fees: {
     registrationFixed: string;
     registrationPercent: string;
@@ -31,12 +36,18 @@ export function InvoiceForm({
   const [activity, setActivity] = useState("misc");
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<PayMethod>("stripe");
+  const [bookedDay, setBookedDay] = useState("");
+  const [coachName, setCoachName] = useState("");
 
   function chooseActivity(value: string) {
     setActivity(value);
     const found = activities.find((item) => item.value === value);
     if (found?.amountCents != null) setAmount(centsToDollarInput(found.amountCents));
+    setBookedDay(found?.bookedDay ?? "");
+    setCoachName(found?.coachName ?? "");
   }
+
+  const coachOptions = coachName && !coaches.includes(coachName) ? [coachName, ...coaches] : coaches;
 
   const groups = ["Trainings", "Plans", "Sessions"];
 
@@ -78,6 +89,25 @@ export function InvoiceForm({
               </optgroup>
             );
           })}
+        </select>
+      </div>
+      <div>
+        <Label htmlFor="bookedDay">Date</Label>
+        <Input className="mt-1" id="bookedDay" name="bookedDay" type="date" value={bookedDay} onChange={(event) => setBookedDay(event.target.value)} />
+      </div>
+      <div>
+        <Label htmlFor="invoiceCoach">Coach</Label>
+        <select
+          id="invoiceCoach"
+          name="coachName"
+          value={coachName}
+          onChange={(event) => setCoachName(event.target.value)}
+          className="mt-1 h-11 w-full rounded-md border border-border bg-white px-3"
+        >
+          <option value="">None</option>
+          {coachOptions.map((name) => (
+            <option key={name} value={name}>{name}</option>
+          ))}
         </select>
       </div>
       <div>
