@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PlanForm } from "@/components/plan-form";
+import { chargeLines, checkoutLineItems } from "@/lib/fees";
+import { loadCheckoutFees } from "@/lib/fees-data";
 import { formatMoney } from "@/lib/money";
-import { planCadence, planIsUnlimited } from "@/lib/plan-options";
+import { isGroupTrainingPlan, planCadence, planIsUnlimited } from "@/lib/plan-options";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +24,10 @@ export default async function SessionOfferPage({
     where: { isCurrent: true },
     orderBy: { createdAt: "desc" },
   });
+  const charge = isGroupTrainingPlan(plan) ? chargeLines(plan.priceCents, await loadCheckoutFees()) : null;
+  const lines = charge
+    ? checkoutLineItems(charge).map((line) => (line.label === "Session" ? { ...line, label: plan.name } : line))
+    : [];
 
   return (
     <div className="mx-auto max-w-lg px-4 py-8">
@@ -42,7 +48,9 @@ export default async function SessionOfferPage({
         <div className="mt-6">
           <PlanForm
             planId={plan.id}
-            priceCents={plan.priceCents}
+            priceCents={charge?.totalCents ?? plan.priceCents}
+            lines={lines}
+            renewalCents={plan.priceCents}
             waiver={waiver.body}
             cadence={plan.billingInterval === "YEAR" ? "Yearly" : "Monthly"}
           />

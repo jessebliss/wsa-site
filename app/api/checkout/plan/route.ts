@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { BookingError } from "@/lib/booking";
 import { ensurePlanStripePrice } from "@/lib/billing";
+import { chargeLines, checkoutLineItems } from "@/lib/fees";
+import { loadCheckoutFees } from "@/lib/fees-data";
+import { isGroupTrainingPlan } from "@/lib/plan-options";
 import { prisma } from "@/lib/prisma";
 import { getStripe, stripeConfigured } from "@/lib/stripe";
 import { appUrl, normalizeEmail } from "@/lib/utils";
@@ -37,6 +40,10 @@ export async function POST(request: Request) {
       );
     }
     const priced = await ensurePlanStripePrice(plan);
+    const charge = isGroupTrainingPlan(plan) ? chargeLines(plan.priceCents, await loadCheckoutFees()) : null;
+    const feeLines = charge
+      ? checkoutLineItems(charge).filter((line) => line.label !== "Session" && line.cents > 0)
+      : [];
     const waiver = await prisma.waiver.findFirst({
       where: { isCurrent: true },
       orderBy: { createdAt: "desc" },
@@ -66,7 +73,17 @@ export async function POST(request: Request) {
       customer_email: email,
       success_url: `${appUrl()}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl()}/sessions/${plan.id}?canceled=1`,
-      line_items: [{ price: priced.stripePriceId!, quantity: 1 }],
+      line_items: [
+        { price: priced.stripePriceId!, quantity: 1 },
+        ...feeLines.map((line) => ({
+          quantity: 1,
+          price_data: {
+            currency: "usd" as const,
+            unit_amount: line.cents,
+            product_data: { name: line.label },
+          },
+        })),
+      ],
       metadata,
       subscription_data: { metadata },
     });

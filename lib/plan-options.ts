@@ -1,3 +1,5 @@
+import { QUARTERBACK_PROGRAM } from "@/lib/private-quarterback";
+
 /** Twelve event colors. Admin picks one swatch per plan. There is no free-form color. */
 export const EVENT_COLORS = [
   { id: "red", label: "Red", hex: "#c4121a" },
@@ -69,4 +71,11 @@ export function planCadence(interval: string | null | undefined) {
 /** Zero included times means the membership does not run out. */
 export function planIsUnlimited(sessions: number | null | undefined) {
   return (sessions ?? 0) <= 0;
+}
+
+/** Group quarterback plans, including the yearly plan and girls group. Speed stays a separate checkout. */
+export function isGroupTrainingPlan(plan: { name: string; program: string; seedKey?: string | null }) {
+  if (plan.program === QUARTERBACK_PROGRAM) return true;
+  if (plan.seedKey?.startsWith("group-")) return true;
+  return /group/i.test(plan.name);
 }

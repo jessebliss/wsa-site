@@ -12,11 +12,15 @@ export function PlanForm({
   priceCents,
   waiver,
   cadence = "Monthly",
+  lines = [],
+  renewalCents,
 }: {
   planId: string;
   priceCents: number;
   waiver: string;
   cadence?: string;
+  lines?: { label: string; cents: number }[];
+  renewalCents?: number;
 }) {
   const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState("");
@@ -53,7 +57,21 @@ export function PlanForm({
       <div className="rounded-xl bg-ink px-4 py-3 text-white">
         <p className="text-xs uppercase tracking-[0.16em] text-white/60">{cadence}</p>
         <p className="font-display text-4xl">{formatMoney(priceCents)}</p>
-        <p className="text-sm text-white/80">Promo codes do not apply to memberships.</p>
+        {lines.length > 1 ? (
+          <ul className="mt-2 space-y-1 text-sm">
+            {lines.map((line) => (
+              <li key={line.label} className="flex justify-between gap-3">
+                <span>{line.label}</span>
+                <span>{formatMoney(line.cents)}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <p className="text-sm text-white/80">
+          {renewalCents != null && renewalCents !== priceCents
+            ? `Registration and tax are on this checkout. The plan renews at ${formatMoney(renewalCents)}. Promo codes do not apply to memberships.`
+            : "Promo codes do not apply to memberships."}
+        </p>
       </div>
       <div>
         <Label htmlFor="parentName">Parent name</Label>
