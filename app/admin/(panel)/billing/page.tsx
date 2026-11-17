@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { markInvoicePaid, saveInvoiceSequence } from "@/app/admin/(panel)/actions";
 import { AdminError } from "@/components/admin-error";
+import { CollapsibleSection } from "@/components/collapsible-section";
 import { DisclosurePanel } from "@/components/disclosure-panel";
 import { InvoiceForm, type InvoiceActivity } from "@/components/invoice-form";
 import { toTransactionRow, TransactionRows } from "@/components/transaction-rows";
@@ -135,6 +136,18 @@ export default async function BillingPage({
         <Button type="submit" variant="outline">Save next number</Button>
         <p className="w-full text-sm text-muted-foreground">The next invoice uses this number, then the one after it. Issued numbers stay put.</p>
       </form>
+      <DisclosurePanel label="Create an invoice" hideLabel="Hide invoice form" className="mt-4">
+        <InvoiceForm
+          activities={activities}
+          coaches={roster}
+          fees={{
+            registrationFixed: centsToDollarInput(fees.registrationFixedCents),
+            registrationPercent: bpsToPercentInput(fees.registrationBps),
+            taxFixed: centsToDollarInput(fees.taxFixedCents),
+            taxPercent: bpsToPercentInput(fees.taxBps),
+          }}
+        />
+      </DisclosurePanel>
       <p className="mt-4 max-w-2xl text-sm text-muted-foreground">
         Invoices are numbered in one sequence. Stripe memberships stay on this page.
       </p>
@@ -157,23 +170,11 @@ export default async function BillingPage({
       {params.saved === "next" ? <p className="mt-3 text-sm font-semibold text-primary">Next invoice number saved.</p> : null}
       {params.saved === "paid" ? <p className="mt-3 text-sm font-semibold text-primary">Marked paid.</p> : null}
 
-      <h2 className="mt-8 font-display text-3xl uppercase">Invoices</h2>
-      <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+      <CollapsibleSection title="Invoices" className="mt-8">
+      <p className="max-w-2xl text-sm text-muted-foreground">
         Stripe sends a one-time checkout. Venmo and Zelle are saved unpaid until you mark them paid.
       </p>
       <TransactionRows invoices={recent.map(toTransactionRow)} />
-      <DisclosurePanel label="Create an invoice" hideLabel="Hide invoice form" className="mt-6">
-        <InvoiceForm
-          activities={activities}
-          coaches={roster}
-          fees={{
-            registrationFixed: centsToDollarInput(fees.registrationFixedCents),
-            registrationPercent: bpsToPercentInput(fees.registrationBps),
-            taxFixed: centsToDollarInput(fees.taxFixedCents),
-            taxPercent: bpsToPercentInput(fees.taxBps),
-          }}
-        />
-      </DisclosurePanel>
       <div className="mt-6 hidden grid-cols-6 gap-3 px-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:grid">
         <span>Number</span>
         <span>Customer</span>
@@ -216,9 +217,10 @@ export default async function BillingPage({
           </li>
         ))}
       </ul>
+      </CollapsibleSection>
 
-      <h2 className="mt-10 font-display text-3xl uppercase">Subscriptions</h2>
-      <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+      <CollapsibleSection title="Subscriptions" className="mt-6" defaultOpen={filtering}>
+      <p className="max-w-2xl text-sm text-muted-foreground">
         Card memberships start when a parent checks out with Stripe. Venmo and Zelle are one-time invoices.
       </p>
       <form className="mt-4 grid gap-3 rounded-2xl bg-white p-4 sm:grid-cols-2">
@@ -273,6 +275,7 @@ export default async function BillingPage({
           </li>
         ))}
       </ul>
+      </CollapsibleSection>
     </div>
   );
 }
