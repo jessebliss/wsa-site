@@ -103,6 +103,7 @@ type InvoiceWrite = {
   paymentMethod: "STRIPE" | "VENMO" | "ZELLE";
   status: "OPEN" | "PAID";
   source: string;
+  subscription?: boolean;
   stripeCheckoutSessionId?: string | null;
   checkoutUrl?: string | null;
   venmoHandle?: string | null;
@@ -149,6 +150,7 @@ async function insertInvoice(tx: Tx, input: InvoiceWrite) {
       paymentMethod: input.paymentMethod,
       status: input.status,
       source: input.source,
+      subscription: input.subscription ?? false,
       stripeCheckoutSessionId: input.stripeCheckoutSessionId ?? null,
       checkoutUrl: input.checkoutUrl ?? null,
       venmoHandle: input.venmoHandle ?? null,
@@ -251,6 +253,7 @@ async function detailsFromCheckout(session: Stripe.Checkout.Session): Promise<In
     paymentMethod: "STRIPE",
     status: "PAID",
     source: "checkout",
+    subscription: true,
     stripeCheckoutSessionId: session.id,
     paidAt: new Date(),
   };

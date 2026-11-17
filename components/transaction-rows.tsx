@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { formatMoney } from "@/lib/money";
+import { formatEt } from "@/lib/time";
 
 export type TransactionRow = {
   id: string;
@@ -7,10 +9,18 @@ export type TransactionRow = {
   parentName: string;
   playerName: string;
   paid: boolean;
+  amount: string;
+  confirmed: string;
+  charge: string;
   bookedDay: string | null;
   sessionId: string | null;
   proposal: string | null;
 };
+
+function confirmedAt(paid: boolean, paidAt: Date | null) {
+  if (!paid || !paidAt) return "";
+  return `${formatEt(paidAt, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })} ET`;
+}
 
 export function transactionProposal(invoice: { proposedDay: string | null; proposedTime: string | null }) {
   if (!invoice.proposedDay || !invoice.proposedTime) return null;
@@ -25,18 +35,25 @@ export function toTransactionRow(invoice: {
   customerName: string;
   playerName: string;
   status: "OPEN" | "PAID";
+  totalCents: number;
+  paidAt: Date | null;
+  subscription: boolean;
   bookedDay: string | null;
   sessionId: string | null;
   proposedDay: string | null;
   proposedTime: string | null;
 }): TransactionRow {
+  const paid = invoice.status === "PAID";
   return {
     id: invoice.id,
     number: invoice.number,
     program: invoice.program?.trim() || invoice.activity,
     parentName: invoice.customerName,
     playerName: invoice.playerName,
-    paid: invoice.status === "PAID",
+    paid,
+    amount: formatMoney(invoice.totalCents),
+    confirmed: confirmedAt(paid, invoice.paidAt),
+    charge: invoice.subscription ? "Subscription" : "One-time",
     bookedDay: invoice.bookedDay,
     sessionId: invoice.sessionId,
     proposal: transactionProposal(invoice),
@@ -48,9 +65,9 @@ export function TransactionRows({ invoices }: { invoices: TransactionRow[] }) {
     <div className="mt-4">
       {invoices.length === 0 ? <p className="text-sm text-muted-foreground">No transactions yet.</p> : null}
       <ul className="space-y-2">
-        {invoices.map((row) => (
-          <li key={row.id} className="rounded-xl bg-white p-3">
-            <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm sm:grid-cols-5">
+        {invoices.map((row, index) => (
+          <li key={row.id} className={`rounded-xl p-3 ${index % 2 === 0 ? "bg-white" : "bg-muted"}`}>
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm md:grid-cols-4 xl:grid-cols-8">
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Invoice</dt>
                 <dd className="font-semibold">{row.number}</dd>
@@ -70,6 +87,18 @@ export function TransactionRows({ invoices }: { invoices: TransactionRow[] }) {
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Paid</dt>
                 <dd>{row.paid ? "Paid" : "Unpaid"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Amount</dt>
+                <dd>{row.amount}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Confirmed</dt>
+                <dd>{row.confirmed}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Charge</dt>
+                <dd>{row.charge}</dd>
               </div>
             </dl>
             {row.bookedDay && row.sessionId ? (

@@ -127,7 +127,15 @@ export default async function BillingPage({
   return (
     <div>
       <h1 className="font-display text-4xl uppercase">Billing</h1>
-      <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+      <form action={saveInvoiceSequence} className="mt-4 flex flex-wrap items-end gap-3 rounded-2xl bg-white p-4">
+        <div>
+          <Label htmlFor="nextNumber">Next invoice number</Label>
+          <Input className="mt-1 w-32" id="nextNumber" name="nextNumber" inputMode="numeric" defaultValue={String(nextNumber)} required />
+        </div>
+        <Button type="submit" variant="outline">Save next number</Button>
+        <p className="w-full text-sm text-muted-foreground">The next invoice uses this number, then the one after it. Issued numbers stay put.</p>
+      </form>
+      <p className="mt-4 max-w-2xl text-sm text-muted-foreground">
         Invoices are numbered in one sequence. Stripe memberships stay on this page.
       </p>
       <AdminError message={params.error} />
@@ -166,14 +174,6 @@ export default async function BillingPage({
           }}
         />
       </DisclosurePanel>
-      <form action={saveInvoiceSequence} className="mt-6 flex flex-wrap items-end gap-3 rounded-2xl bg-white p-4">
-        <div>
-          <Label htmlFor="nextNumber">Next invoice number</Label>
-          <Input className="mt-1 w-32" id="nextNumber" name="nextNumber" inputMode="numeric" defaultValue={String(nextNumber)} required />
-        </div>
-        <Button type="submit" variant="outline">Save next number</Button>
-        <p className="w-full text-sm text-muted-foreground">The next invoice uses this number, then the one after it. Issued numbers stay put.</p>
-      </form>
       <div className="mt-6 hidden grid-cols-6 gap-3 px-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:grid">
         <span>Number</span>
         <span>Customer</span>

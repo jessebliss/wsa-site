@@ -417,6 +417,7 @@ model Invoice {
   paymentMethod           InvoicePayMethod
   status                  InvoiceStatus    @default(OPEN)
   source                  String
+  subscription            Boolean          @default(false)
   stripeCheckoutSessionId String?          @unique
   checkoutUrl             String?
   venmoHandle             String?
